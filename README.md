@@ -1,6 +1,6 @@
 # NextApiRouter
 
-A Next.js Api Router that can give you the similar experiences of building backend api in `experess.js`
+A `next.js` api router that feels like `experess.js`
 
 - [NextApiRouter](#nextapirouter)
   - [Motivation](#motivation)
