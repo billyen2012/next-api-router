@@ -53,7 +53,7 @@ under the `/app` dir, create a folder structure as shown below
 app/
 └── api/
     └── [...]/
-        └── route.ts
+        └── route.js
 ```
 
 - The `[...]` means to catch all the the request. This is required since `NextApiRouter` will create a separete route table to match the request url.
@@ -90,11 +90,11 @@ The example shown in the quick start section will not process the base route suc
 app/
 └── api/
     ├── [...]/
-    │   └── route.ts
-    └── route.ts
+    │   └── route.js
+    └── route.js
 ```
 
-And then have you `const export app = NextApiRouter()` created in some other folder or file and then import them to both `route.ts`
+And then have you `const export app = NextApiRouter()` created in some other folder or file and then import them to both `route.js`
 
 ## Middlewares
 
@@ -332,10 +332,10 @@ if you are deploying to Vercel, this is strongly discouraged to create a sub rou
 app/
 └── api/
     ├── [...]/
-    │   └── route.ts
+    │   └── route.js
     └── admin/
         └── [...]/
-            └── route.ts
+            └── route.js
 ```
 
 ```js
