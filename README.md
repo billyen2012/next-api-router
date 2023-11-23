@@ -1,32 +1,43 @@
-# NextApiRouter
+<p align="center">
+  <a href="https://nextjs.org">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745612/nmlcwzxjzqz47n3ggie4.png">
+      <img src="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745689/dmkxww0uuhgw7h4p6sc7.png" height="128">
+    </picture>
+  </a>
+</p>
 
-A `next.js` api router that feels like `experess.js`
+<p align="center">
+A <strong>next.js</strong> api router that feels like <strong>experess.js</strong>
+</p>
 
-- [NextApiRouter](#nextapirouter)
-  - [Motivation](#motivation)
-  - [Installation](#installation)
-  - [Quick Start](#quick-start)
-  - [The Base Route Problem](#the-base-route-problem)
-  - [Middlewares](#middlewares)
-  - [Send a file](#send-a-file)
-  - [URL Params](#url-params)
-  - [Query Params](#query-params)
-  - [Body Parser](#body-parser)
-  - [Headers](#headers)
-  - [Cookies](#cookies)
-  - [Ejs](#ejs)
-  - [Error Hanlder](#error-hanlder)
-  - [Sub-Router](#sub-router)
-    - [If Self-hosted](#if-self-hosted)
-    - [If Deployed to Vercel](#if-deployed-to-vercel)
-  - [Sessions](#sessions)
-    - [with `iron-session`](#with-iron-session)
-    - [with `next-session`](#with-next-session)
+## Table of contents
+
+- [Table of contents](#table-of-contents)
+- [Motivation](#motivation)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [The Base Route Problem](#the-base-route-problem)
+- [Middlewares](#middlewares)
+- [Send a file](#send-a-file)
+- [URL Params](#url-params)
+- [Query Params](#query-params)
+- [Body Parser](#body-parser)
+- [Headers](#headers)
+- [Cookies](#cookies)
+- [Ejs](#ejs)
+- [Error Hanlder](#error-hanlder)
+- [Sub-Router](#sub-router)
+  - [If Self-hosted](#if-self-hosted)
+  - [If Deployed to Vercel](#if-deployed-to-vercel)
+- [Sessions](#sessions)
+  - [with `iron-session`](#with-iron-session)
+  - [with `next-session`](#with-next-session)
 
 Note:
 
 - ⚠️ If you are deploying to Vercle, this might not be a good option since Vercle is a *Serverless Function* and `NextApiRouter` can become an overhead for every single api call. It will be more suitable if you are self-hosted. Otherwise, try not to have every route built in one single file (refer to [here](#sub-router))
-- This is only compatabile with new `route api` introduced in `next13`
+- This is currently only compatabile with new `route api` introduced in `next13`
 - If you are not familar with `express.js`, learn `express.js` first.
 
 ## Motivation
