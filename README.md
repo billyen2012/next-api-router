@@ -14,6 +14,7 @@ A <strong>next.js</strong> api router that feels like <strong>experess.js</stron
 ## Table of contents
 
 - [Table of contents](#table-of-contents)
+- [Note](#note)
 - [Motivation](#motivation)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -34,7 +35,7 @@ A <strong>next.js</strong> api router that feels like <strong>experess.js</stron
   - [with `iron-session`](#with-iron-session)
   - [with `next-session`](#with-next-session)
 
-Note:
+## Note
 
 - ⚠️ If you are deploying to Vercle, this might not be a good option since Vercle is a *Serverless Function* and `NextApiRouter` can become an overhead for every single api call. It will be more suitable if you are self-hosted. Otherwise, try not to have every route built in one single file (refer to [here](#sub-router))
 - This is currently only compatabile with new `route api` introduced in `next13`
