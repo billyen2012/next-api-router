@@ -1,0 +1,15 @@
+node_modules
+yarn.lock
+package.json.lock
+*.test.js
+*.config.js
+.babelrc
+yarn.lock
+.gitignore
+src
+/index.js
+/index.d.ts
+.node_modules
+CHANGELOG.md
+.github
+.changeset
