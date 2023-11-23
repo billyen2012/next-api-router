@@ -316,11 +316,8 @@ And in app `route.js`
 ```js
 import NextApiRouter from "next-api-router";
 import router from '../the-router-you-just-added'
-const router = NextApiRouter()
 
-router.get("/foo", (req,res)=>{
-  res.send("bar")
-})
+const app = NextApiRouter()
 
 app.use("/subroute", router)
 
