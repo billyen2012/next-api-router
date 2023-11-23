@@ -36,13 +36,13 @@ Next.js is awesome, however, using it to build backend api just is not intuitive
 ## Installation
 
 ```context
-npm i next-api-router
+npm i @billyen2012/next-api-router
 ```
 
 or for yarn
 
 ```context
-yarn add next-api-router
+yarn add @billyen2012/next-api-router
 ```
 
 ## Quick Start
