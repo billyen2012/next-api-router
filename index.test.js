@@ -195,6 +195,44 @@ describe("behaviors", () => {
     expect(request.err.message).toBe(TEST_ERROR_MESSAGE);
   });
 
+  test("writeHead(), writeLine() and end()", async () => {
+    const app3 = NextApiRouter({ timeout: 3000 });
+    app3.get("/writeline", (req, res) => {
+      const run = async () => {
+        res.writeHead(200, { "content-type": "text/html" });
+        res.writeLine("start");
+        for (let i = 0; i < 2; i++) {
+          await sleep(50);
+          res.writeLine(i);
+        }
+        res.end("end");
+      };
+
+      run();
+    });
+    const request = makeHttpRequest(BASE_URL + "/writeline", {
+      method: "GET",
+    });
+    const response = await app3.handler()(request);
+
+    // test writeHead
+    expect(response.headers.get("content-type")).toBe("text/html");
+
+    const reader = response.body.getReader();
+    const expectResult = ["start", "0", "1", "end"];
+
+    let i = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      // test writeLine
+      expect(value).toBe(expectResult[i]);
+      i++;
+      if (done) {
+        break;
+      }
+    }
+  });
+
   describe("middlewares", () => {
     // build a new app for testing middlewares
     const app2 = NextApiRouter({
@@ -276,7 +314,7 @@ describe("url & query params", () => {
     expect(request.params.postId).toBe(2);
   });
 
-  test("url params can assinged different name in different route", async () => {
+  test("url params can assigned different name in different route", async () => {
     const request = makeHttpRequest(BASE_URL + "/user/1/post/2/followers", {
       method: "GET",
     });

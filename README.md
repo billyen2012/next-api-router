@@ -1,14 +1,12 @@
 <p align="center">
-  <a href="https://nextjs.org">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745612/nmlcwzxjzqz47n3ggie4.png">
-      <img src="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745689/dmkxww0uuhgw7h4p6sc7.png" height="128">
-    </picture>
-  </a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745612/nmlcwzxjzqz47n3ggie4.png">
+    <img src="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745689/dmkxww0uuhgw7h4p6sc7.png" height="128">
+  </picture>
 </p>
 
 <p align="center">
-A <strong>next.js</strong> api router that feels like <strong>experess.js</strong>
+A <strong>next.js</strong> api router that feels like <strong>express.js</strong>
 </p>
 
 ## Table of contents
@@ -21,13 +19,15 @@ A <strong>next.js</strong> api router that feels like <strong>experess.js</stron
 - [The Base Route Problem](#the-base-route-problem)
 - [Middlewares](#middlewares)
 - [Send a file](#send-a-file)
+- [`writeHead(status, headers)`, `writeLine(msg)` and `end(msg)`](#writeheadstatus-headers-writelinemsg-and-endmsg)
 - [URL Params](#url-params)
 - [Query Params](#query-params)
 - [Body Parser](#body-parser)
 - [Headers](#headers)
 - [Cookies](#cookies)
 - [Ejs](#ejs)
-- [Error Hanlder](#error-hanlder)
+- [Error Handler](#error-handler)
+- [Global Try/Catch and Catch Async](#global-trycatch-and-catch-async)
 - [Sub-Router](#sub-router)
   - [If Self-hosted](#if-self-hosted)
   - [If Deployed to Vercel](#if-deployed-to-vercel)
@@ -37,13 +37,13 @@ A <strong>next.js</strong> api router that feels like <strong>experess.js</stron
 
 ## Note
 
-- ⚠️ If you are deploying to Vercle, this might not be a good option since Vercle is a *Serverless Function* and `NextApiRouter` can become an overhead for every single api call. It will be more suitable if you are self-hosted. Otherwise, try not to have every route built in one single file (refer to [here](#sub-router))
-- This is currently only compatabile with new `route api` introduced in `next13`
-- If you are not familar with `express.js`, learn `express.js` first.
+- ⚠️ If you are deploying to Vercel, this might not be a good option since Vercel is a *Serverless Function* and `NextApiRouter` can become an overhead for every single api call. It will be more suitable if you are self-hosted. Otherwise, try not to have every route built in one single file (refer to [here](#sub-router))
+- This is currently only compatible with new `route api` introduced in `next13`
+- If you are not familiar with `express.js`, learn `express.js` first.
 
 ## Motivation
 
-Next.js is awesome, however, using it to build backend api just is not intuitive and hard to manage if app size start to scale, especially it does not have a good support to middleware. Eventhough you can establish a custom server with `server.js` in next.js, the hustle you have to go through is not worthy and it is not beginner friendly as well. Therefore, this is built to levarage the concept of `express.js` by which making `next.js` backend api development easier.
+Next.js is awesome, however, using it to build backend api just is not intuitive and hard to manage if app size start to scale, especially it does not have a good support to middleware. Even though you can establish a custom server with `server.js` in next.js, the hustle you have to go through is not worthy and it is not beginner friendly as well. Therefore, this is built to leverage the concept of `express.js` by which making `next.js` backend api development easier.
 
 ## Installation
 
@@ -110,7 +110,7 @@ And then have you `const export app = NextApiRouter()` created in some other fol
 
 ## Middlewares
 
-- Refer to `express.js` for how this works, but the code example should be self explainatory.
+- Refer to `express.js` for how this works, but the code example should be self explanatory.
 
 ```js
 
@@ -148,10 +148,10 @@ import fs from "fs";
 import NextApiRouter from "next-api-router";
 
 // if file is a Readable
-app.get("/file", (req, res) => {
+app.get("/file", async (req, res) => {
  const file = fs.createReadStream(process.cwd() + "/src/app/file.png");
  // pipe it
- res.pipe(file);
+ await res.pipe(file);
 });
 
 // if file is a Buffer or a Readablestream
@@ -164,6 +164,48 @@ app.get("/file", (req, res) => {
 const app = NextApiRouter();
 
 export const GET = app.handler();
+```
+
+## `writeHead(status, headers)`, `writeLine(msg)` and `end(msg)`
+
+```js
+const sleep = (ms) => {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(), ms);
+  });
+};
+
+app.get("/writeline",
+/**
+ * This callback must not be an async proces.
+ * Instead, put everything into a async function locally
+ * and call it at the end (just see example below)
+ **/
+(req, res, next) => {
+  res.writeHead(200, { "content-type": "text/html" });
+
+  const run = async () => {
+    res.writeLine("<h3>start</h3>");
+    for (let i = 0; i < 10; i++) {
+      await sleep(200);
+      res.writeLine(`<p>${i}</p>`);
+    }
+
+    res.end("<h3>end</h3>");
+  };
+
+  run()
+    // must catch error, otherwise it may cause UnhandledPromiseRejection error
+    .catch((err) => {
+      /**
+       *  do NOT do `catch(next)`, it may not work because as soon as you call res.writeLine() or res.writeHead(), a
+       *  response has already being sent back the client, and the program will assume response was sent to the client
+       *  without error, hence the global error handler will never be triggered.
+       *  Instead, you should pass your error handler directly to here.
+       */
+      console.log(err);
+    });
+});
 ```
 
 ## URL Params
@@ -180,7 +222,7 @@ app.get("/users/:userId/post/:postId", (req, res) => {
 
 ```js
 app.get("/users", (req, res) => {
-  // assume some one send /users?id=1
+  // assume someone send '/users?id=1'
   const { id } = req.query;
   res.send(id)
 });
@@ -231,6 +273,7 @@ app.get("/", async (req, res, next) => {
 });
 ```
 
+
 ## Ejs
 
 ```js
@@ -259,7 +302,7 @@ Example of ejs
 
 You can also just directly pass ejs template to the `render()` method
 
-If you are deploying to Vercel, this is the way to go because Vercel will have problem copying your `.ejs` template after project built. So just stick to this approach to aviod all the hurdles.
+If you are deploying to Vercel, this is the way to go because Vercel will have problem copying your `.ejs` template after project built. So just stick to this approach to avoid all the hurdles.
 
 ```js
 app.get("/render", async (req, res, next) => {
@@ -276,10 +319,10 @@ app.get("/render", async (req, res, next) => {
 })
 ```
 
-## Error Hanlder
+## Error Handler
 
-- the example show the default error handler. If route can't be found, the error object will be `NotFoundError` and if json body parser failed to parse the body, the error object `MalformedJsonError`
-- if you override the default error handler, just ensure you cover all causes.
+- the example is the default error handler.
+- if you override the default error handler, just ensure you cover all the cases.
 
 ```js
 app.errorHandler((err, res, res)=>{
@@ -291,11 +334,13 @@ app.errorHandler((err, res, res)=>{
         return res.status(400).send("Malformed json in body's payload");
       }
       if (err instanceof TimeoutError) {
-        return res.status(408).send("Request timeouot");
+        return res.status(408).send("Request timeout");
       }
       if (err instanceof MethodNotAllowedError) {
         return res.status(405).send("Method not allowed");
       }
+
+      console.log(err);
 
       res
         .status(500)
@@ -305,9 +350,40 @@ app.errorHandler((err, res, res)=>{
 })
 ```
 
+## Global Try/Catch and Catch Async
+
+To jump directly to the error handler from any point of your code, you can simply throw an error. This will be handy when doing input validation, authentication, etc.
+
+```js
+app.use((req,res, next)=>{
+    if(!req.session.user){
+       throw new Error("Not Authorized")
+    }
+    next()
+});
+```
+
+If there is any `Promise`, make sure you `await` the promise, or it will cause the unhandled promise rejection.
+
+```js
+app.use(async (req,res, next)=>{
+    await someAsyncProcess()
+    next()
+});
+
+app.use(async (req,res, next)=>{
+    // or you can do
+    someAsyncProcess().catch(err=>{
+      // usually you will want to have a custom error handler here, but this is just an example
+      console.log(err)
+    })
+    next()
+});
+```
+
 ## Sub-Router
 
-Create sub router to allow you abascrat your routes into different files and create more complex routing.
+Create sub router to allow you separate your routes into different files and create more complex routing.
 
 ### If Self-hosted
 
@@ -338,7 +414,7 @@ export default router
 
 ### If Deployed to Vercel
 
-if you are deploying to Vercel, this is strongly discouraged to create a sub router in the apporach shown above, instead, you can do following:
+if you are deploying to Vercel, this is recommended to use the following approach.
 
 ```text
 app/
@@ -413,7 +489,7 @@ export const GET = app.handler();
 
 ### with `next-session`
 
-`next-session` will save data in either memoery or database.
+`next-session` will save data in either memory or database.
 
 ```js
 // example reference from https://github.com/hoangvvo/next-session#readme

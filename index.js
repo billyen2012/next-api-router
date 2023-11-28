@@ -277,6 +277,8 @@ const NextApiRouter = (
         return res.status(405).send("Method not allowed");
       }
 
+      console.log(err);
+
       res
         .status(500)
         .send(

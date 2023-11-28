@@ -113,7 +113,9 @@ export declare class NextApiRouterResponse {
     data?: EjsData,
     options?: EjsOptions & { async?: boolean }
   ): Promise<void>;
-  writeHead(statusCode: number, headers?: OutgoingHttpHeaders): void;
+  writeHead(statusCode: number, headers?: OutgoingHttpHeaders): this;
+  writeLine(message?: number | string | Uint8Array): this;
+  end(message?: number | string | Uint8Array): void;
   getHeader(name: HttpHeaders[number]): string;
   getHeaders: typeof GetHeaders;
 }

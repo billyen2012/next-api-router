@@ -96,7 +96,7 @@ export class NextApiRouterResponse extends Response {
     return this;
   }
   setHeaders(headers) {
-    for (let key of headers) {
+    for (let key in headers) {
       this.headers.set(key, headers[key]);
     }
     return this;
@@ -225,9 +225,45 @@ export class NextApiRouterResponse extends Response {
 
     // throw new Error("response has already been sent");
   }
+  _writeSetup() {
+    if (!this._readstream) {
+      this._isEnded = false;
+      this._readstream = new ReadableStream({
+        start: async (controller) => {
+          this._readstreamController = controller;
+        },
+      });
+    }
+
+    if (!this._sent) {
+      this.send(this._readstream);
+    }
+  }
+  _processWriteMessage(message = "") {
+    this._readstreamController.enqueue(
+      message instanceof Uint8Array
+        ? message
+        : typeof message === "string"
+        ? message
+        : String(message)
+    );
+  }
   writeHead(statusCode, headers) {
     this.status(statusCode);
     this.setHeaders(headers);
-    this.send();
+    this._writeSetup();
+    return this;
+  }
+  writeLine(message = "") {
+    this._writeSetup();
+    this._processWriteMessage(message);
+    return this;
+  }
+  end(message = "") {
+    if (this._readstreamController && !this._isEnded) {
+      this._processWriteMessage(message);
+      this._readstreamController.close();
+      this._isEnded = true;
+    }
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "@billyen2012/next-api-router",
-  "version": "1.1.5",
-  "description": "A api router for next.js that feels like express.js",
+  "version": "1.2.0",
+  "description": "A next.js api router that feels like express.js",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -18,7 +18,9 @@
   "keywords": [
     "next-api-router",
     "next",
-    "router"
+    "api",
+    "router",
+    "express"
   ],
   "author": "Bill Yen <billyen2012@gmail.com>",
   "license": "MIT",
