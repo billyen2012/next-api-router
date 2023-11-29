@@ -1,6 +1,5 @@
 import { type Data as EjsData, type Options as EjsOptions } from "ejs";
 import { type ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
-import { type OutgoingHttpHeaders, type IncomingHttpHeaders } from "http";
 import { Readable } from "stream";
 type HttpHeaders = [
   "accept",
@@ -98,11 +97,107 @@ type HttpHeaders = [
   "x-xss-protection"
 ];
 
+export type HttpHeadersObject = {
+  accept?: string;
+  "accept-charset"?: string;
+  "accept-datetime"?: string;
+  "accept-encoding"?: string;
+  "accept-language"?: string;
+  "accept-patch"?: string;
+  "accept-ranges"?: string;
+  "access-control-allow-credentials"?: string;
+  "access-control-allow-headers"?: string;
+  "access-control-allow-methods"?: string;
+  "access-control-allow-origin"?: string;
+  "access-control-expose-headers"?: string;
+  "access-control-max-age"?: string;
+  "access-control-request-headers"?: string;
+  "access-control-request-method"?: string;
+  age?: string;
+  allow?: string;
+  "alt-svc"?: string;
+  authorization?: string;
+  "cache-control"?: string;
+  connection?: string;
+  "content-disposition"?: string;
+  "content-encoding"?: string;
+  "content-language"?: string;
+  "content-length"?: string;
+  "content-location"?: string;
+  "content-range"?: string;
+  "content-type"?: string;
+  cookie?: string;
+  date?: string;
+  "delta-base"?: string;
+  dnt?: string;
+  etag?: string;
+  expect?: string;
+  expires?: string;
+  forwarded?: string;
+  from?: string;
+  "front-end-https"?: string;
+  host?: string;
+  "if-match"?: string;
+  "if-modified-since"?: string;
+  "if-none-match"?: string;
+  "if-range"?: string;
+  "if-unmodified-since"?: string;
+  im?: string;
+  "last-modified"?: string;
+  link?: string;
+  location?: string;
+  "max-forwards"?: string;
+  origin?: string;
+  p3p?: string;
+  pragma?: string;
+  "proxy-authenticate"?: string;
+  "proxy-authorization"?: string;
+  "proxy-connection"?: string;
+  "public-key-pins"?: string;
+  range?: string;
+  referer?: string;
+  refresh?: string;
+  "retry-after"?: string;
+  server?: string;
+  "set-cookie"?: string;
+  "strict-transport-security"?: string;
+  te?: string;
+  tk?: string;
+  trailer?: string;
+  "transfer-encoding"?: string;
+  upgrade?: string;
+  "user-agent"?: string;
+  vary?: string;
+  via?: string;
+  warning?: string;
+  "www-authenticate"?: string;
+  "x-att-deviceid"?: string;
+  "x-clacks-overhead"?: string;
+  "x-content-type-options"?: string;
+  "x-csrf-token"?: string;
+  "x-do-not-track"?: string;
+  "x-forwarded-for"?: string;
+  "x-forwarded-host"?: string;
+  "x-forwarded-proto"?: string;
+  "x-frame-options"?: string;
+  "x-http-method-override"?: string;
+  "x-permitted-cross-domain-policies"?: string;
+  "x-pingback"?: string;
+  "x-powered-by"?: string;
+  "x-request-id"?: string;
+  "x-requested-with"?: string;
+  "x-ua-compatible"?: string;
+  "x-uidh"?: string;
+  "x-wap-profile"?: string;
+  "x-webkit-csp"?: string;
+  "x-xss-protection"?: string;
+};
+
 export declare class NextApiRouterResponse {
   headers: Headers;
   cookies: ReadonlyRequestCookies;
   setHeader(name: HttpHeaders[number], value: string): this;
-  setHeaders(headers: OutgoingHttpHeaders | IncomingHttpHeaders): this;
+  setHeaders(headers: HttpHeadersObject): this;
   status(code: number): this;
   json(data: object): this;
   redirect(url: string): void;
@@ -113,7 +208,7 @@ export declare class NextApiRouterResponse {
     data?: EjsData,
     options?: EjsOptions & { async?: boolean }
   ): Promise<void>;
-  writeHead(statusCode: number, headers?: OutgoingHttpHeaders): this;
+  writeHead(statusCode: number, headers?: HttpHeadersObject): this;
   writeLine(message?: number | string | Uint8Array): this;
   end(message?: number | string | Uint8Array): void;
   getHeader(name: HttpHeaders[number]): string;
@@ -127,7 +222,7 @@ export declare class NextApiRouteError extends Error {
 }
 export declare class NotFoundError extends NextApiRouteError {}
 export declare class MalformedJsonError extends NextApiRouteError {}
-export declare class NoReponseFromHandlerError extends NextApiRouteError {}
+export declare class NoResponseFromHandlerError extends NextApiRouteError {}
 export declare class TimeoutError extends NextApiRouteError {}
 export declare class MethodNotAllowedError extends NextApiRouteError {}
 export interface NextCallback {
@@ -167,8 +262,9 @@ declare function GetHeaders<T extends string>(
 ): Partial<Record<T, string>>;
 
 export type BodyParser = {
-  text: () => NextApiProcessCallback;
-  json: () => NextApiProcessCallback;
+  text(): NextApiProcessCallback;
+  json(): NextApiProcessCallback;
+  form(): NextApiProcessCallback;
 };
 
 export type NextApiRouterOptions = {

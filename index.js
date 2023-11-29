@@ -2,13 +2,13 @@ import {
   NotFoundError,
   MalformedJsonError,
   NextApiRouteError,
-  NoReponseFromHandlerError,
+  NoResponseFromHandlerError,
   TimeoutError,
   MethodNotAllowedError,
 } from "./src/errors";
 import { NextApiRouterResponse, getHeader, getHeaders } from "./src/response";
 import { randomId } from "./src/util/randomId";
-
+import typeis from "type-is";
 /**
  * @callback NextApiProcessCallback
  * @param {Request | {query:{}, params:{}, data:any}} request
@@ -44,7 +44,7 @@ const getParamsRegisterCode = (paramsLocation = [], urlPartsCount) => {
  * This is to obtain a unique url params register
  * e.g. /path/:param1/to/:param2
  *      /path/:name1/to/:name2/somewhere
- * The way to tell the difference of that two pathes will be the location of the ":"
+ * The way to tell the difference of that two paths will be the location of the ":"
  * in the parts of the url, and total counts of the urls parts. Eventually, we will
  * be able to get a coordinate-like key-value value to correctly map those values from
  * the incoming url.
@@ -63,18 +63,14 @@ const getUniqueUrlParamsRegister = (urlParts = []) => {
 /**
  * @param {string} value
  */
-const parseQueryParam = (value) => {
+const parseParam = (value) => {
   // handle num case
   const validNumberRegex = /^(\d+(\.\d*)?|\.\d+)$/;
   if (validNumberRegex.test(value)) {
     if (value > Number.MAX_SAFE_INTEGER) {
-      return BigInt(value);
+      return value;
     }
-    const num = parseFloat(value);
-    if (Number.isInteger(num)) {
-      return parseInt(value);
-    }
-    return num;
+    return Number(value);
   }
   // handle boolean case
   const truthyStr = value.toLocaleLowerCase();
@@ -83,6 +79,23 @@ const parseQueryParam = (value) => {
   }
   // any other case
   return decodeURIComponent(value);
+};
+
+/**
+ * check if bodyParser should parse the data
+ */
+const shouldParse = ({ req, type }) => {
+  if (
+    req.method.toLocaleLowerCase() === "get" ||
+    !typeis.is(
+      // pass a pseudo request object. All it need is headers
+      req.headers.get("content-type"),
+      type
+    )
+  ) {
+    return false;
+  }
+  return true;
 };
 
 const NextApiRouter = (
@@ -213,7 +226,7 @@ const NextApiRouter = (
     // we don't the paramsLocation yet, so it has to be collected here again
     const paramsLocation = [];
     // collect all params and it value in an array
-    const paramsColletion = [];
+    const paramsCollection = [];
     const urlPartsCount = urlParts.length;
 
     let i = -1;
@@ -223,7 +236,7 @@ const NextApiRouter = (
       if (next) {
         // map url part to params if the node is a url param
         if (typeof next.paramsKey !== "undefined") {
-          paramsColletion.push([next.paramsKey, parseQueryParam(urlPart)]);
+          paramsCollection.push([next.paramsKey, parseParam(urlPart)]);
           paramsLocation.push(i);
         }
         currentNode = next;
@@ -236,16 +249,16 @@ const NextApiRouter = (
     // move forward to method
     currentNode = currentNode[method];
 
-    // if there is callbacks in cucurrentNode, meaning there is route match
+    // if there is callbacks in currentNode, meaning there is route match
     if (currentNode) {
       const params = {};
       // mapping params
-      if (paramsColletion.length > 0) {
+      if (paramsCollection.length > 0) {
         const urlParamsRegister = getParamsRegisterCode(
           paramsLocation,
           urlPartsCount
         );
-        paramsColletion.forEach((item) => {
+        paramsCollection.forEach((item) => {
           const [paramsKeyObj, value] = item;
           params[paramsKeyObj[urlParamsRegister]] = value;
         });
@@ -271,7 +284,7 @@ const NextApiRouter = (
         return res.status(400).send("Malformed json in body's payload");
       }
       if (err instanceof TimeoutError) {
-        return res.status(408).send("Request timeouot");
+        return res.status(408).send("Request timeout");
       }
       if (err instanceof MethodNotAllowedError) {
         return res.status(405).send("Method not allowed");
@@ -312,12 +325,15 @@ const NextApiRouter = (
       return this;
     },
     bodyParser: {
-      text() {
+      text({ type = ["text"] } = {}) {
         /**
          * @param {Request} req
          * @param {(err)=>{}} next
          */
         return async (req, res, next) => {
+          if (!shouldParse({ req, type })) {
+            return next();
+          }
           try {
             req.data = await req.text();
             next();
@@ -326,17 +342,54 @@ const NextApiRouter = (
           }
         };
       },
-      json() {
+      json({ type = ["json"] } = {}) {
         /**
          * @param {Request} req
          * @param {(err)=>{}} next
          */
         return async (req, res, next) => {
+          if (!shouldParse({ req, type })) {
+            return next();
+          }
           try {
-            req.data = await req.json();
+            const text = await req.text();
+            if (text) {
+              req.data = JSON.parse(text);
+            } else {
+              req.data = {};
+            }
             next();
           } catch (err) {
             next(new MalformedJsonError("Malformed Json"));
+          }
+        };
+      },
+      form({ type = ["urlencoded", "multipart/form-data"] } = {}) {
+        /**
+         * @param {Request} req
+         * @param {(err)=>{}} next
+         */
+        return async (req, res, next) => {
+          if (!shouldParse({ req, type })) {
+            return next();
+          }
+          try {
+            const formData = await req.formData();
+
+            const map = {};
+            for (const [key, value] of formData.entries()) {
+              map[key] = parseParam(value);
+            }
+            req.data = map;
+            next();
+          } catch (err) {
+            /**
+             * To handle "Could not parse content as FormData" error, just set data to empty object.
+             * No need to forward to error handler because form-data is pretty much primitive behavior
+             * of html and having malformed form-data in the body is extremely low.
+             */
+            req.data = {};
+            next();
           }
         };
       },
@@ -360,7 +413,7 @@ const NextApiRouter = (
           subRouter._middlewareCollections.unshift(...middlewares);
           subRouter._nodeCollections.forEach((node) => {
             node.preMiddlewares.unshift(
-              // pass middelware already be collected in parent router
+              // pass middleware already be collected in parent router
               ...[
                 ...this._middlewareCollections,
                 // then add the child router middlewares
@@ -398,7 +451,7 @@ const NextApiRouter = (
           ejsFolderPath: this.ejsFolderPath,
         });
 
-        // match url parts to the routable and call middlewarre and route cb in sequences
+        // match url parts to the routable and call middleware and route cb in sequences
         const {
           err = null,
           callbacks = [],
@@ -423,7 +476,7 @@ const NextApiRouter = (
         // handle search param
         request.query = {};
         for (const [key, value] of request.nextUrl.searchParams) {
-          request.query[key] = parseQueryParam(value);
+          request.query[key] = parseParam(value);
         }
 
         // if route does not match, then just run through all middlewares
@@ -553,9 +606,9 @@ const NextApiRouter = (
           return response._response;
         }
 
-        // no reponse
+        // no response
         await this._errorCallback(
-          new NoReponseFromHandlerError(
+          new NoResponseFromHandlerError(
             `route '${reqUrlObj.pathname}' does not return any response.`
           ),
           request,
@@ -574,7 +627,7 @@ export {
   NotFoundError,
   MalformedJsonError,
   NextApiRouteError,
-  NoReponseFromHandlerError,
+  NoResponseFromHandlerError,
   TimeoutError,
   MethodNotAllowedError,
 };

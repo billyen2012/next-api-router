@@ -3,7 +3,7 @@ import NextApiRouter, {
   MethodNotAllowedError,
   NotFoundError,
   TimeoutError,
-} from ".";
+} from "./index";
 import { makeHttpRequest } from "./src/util/makeHttpRequest";
 import { sleep } from "./src/util/sleep";
 
@@ -11,8 +11,9 @@ const BASE_URL = "http://localhost:3000/api";
 const TEST_TIME_OUT_ROUTE = "/timeout";
 const TEST_HTTP_METHOD_ROUTE = "/method/test";
 const TEST_ALL_HTTP_METHOD_ROUTE = "/method/all";
-const TEST_PARSE_JSON = "/pasre-json";
-const TEST_PARSE_TEXT = "/pasre-text";
+const TEST_PARSE_JSON = "/parse-json";
+const TEST_PARSE_TEXT = "/parse-text";
+const TEST_PARSE_FORM = "/parse-form";
 const TEST_EJS_ROUTE = "/ejs";
 const TEST_ERROR_ROUTE = "/error";
 const TEST_ERROR_MESSAGE = "THIS IS AN ERROR";
@@ -60,6 +61,10 @@ app.post(TEST_PARSE_JSON, app.bodyParser.json(), (req, res) => {
 });
 
 app.post(TEST_PARSE_TEXT, app.bodyParser.text(), (req, res) => {
+  res.send("OK");
+});
+
+app.post(TEST_PARSE_FORM, app.bodyParser.form(), (req, res) => {
   res.send("OK");
 });
 
@@ -351,9 +356,24 @@ describe("bodyParser", () => {
     const request = makeHttpRequest(BASE_URL + TEST_PARSE_JSON, {
       body: JSON.stringify(data),
       method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
     });
     await routeHandler(request);
     expect(request.data.a).toBe("b");
+  });
+
+  test("json() parse empty object if body is empty", async () => {
+    const request = makeHttpRequest(BASE_URL + TEST_PARSE_JSON, {
+      body: "",
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+    });
+    await routeHandler(request);
+    expect(Object.keys(request.data).length).toBe(0);
   });
 
   test("json() will throw MalformedJson error if request body is not a valid JSON", async () => {
@@ -361,20 +381,56 @@ describe("bodyParser", () => {
     const request = makeHttpRequest(BASE_URL + TEST_PARSE_JSON, {
       body: data,
       method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
     });
     const res = await routeHandler(request);
     expect(request.err).toBeInstanceOf(MalformedJsonError);
   });
 
-  test("text() will pase body as text (regardless header content-type)", async () => {
+  test("text() will pase body as text", async () => {
     const text = "some random text";
     const data = Buffer.from(text);
     const request = makeHttpRequest(BASE_URL + TEST_PARSE_TEXT, {
       body: data,
       method: "POST",
+      headers: {
+        "content-type": "text/plain",
+      },
     });
     const res = await routeHandler(request);
     expect(typeof request.data).toBe("string");
     expect(request.data).toBe(text);
+  });
+
+  test("form() will parse url formdata", async () => {
+    const form = new FormData();
+    form.append("a", "b");
+    form.append("c", "d");
+    form.append("e", "1");
+    const request = makeHttpRequest(BASE_URL + TEST_PARSE_FORM, {
+      body: form,
+      method: "POST",
+      // do not added content-type header, it will be added by the form object automatically
+    });
+
+    const res = await routeHandler(request);
+
+    expect(request.data.a).toBe("b");
+    expect(request.data.c).toBe("d");
+    expect(request.data.e).toBe(1);
+  });
+
+  test("form() will parse empty object if body is empty", async () => {
+    const request = makeHttpRequest(BASE_URL + TEST_PARSE_FORM, {
+      body: "",
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+    });
+    await routeHandler(request);
+    expect(Object.keys(request.data).length).toBe(0);
   });
 });

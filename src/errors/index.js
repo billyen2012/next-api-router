@@ -15,8 +15,8 @@ export class NotFoundError extends NextApiRouteError {
 export class MalformedJsonError extends NextApiRouteError {
   name = "MalformedJsonError";
 }
-export class NoReponseFromHandlerError extends NextApiRouteError {
-  name = "NoReponseFromHandlerError";
+export class NoResponseFromHandlerError extends NextApiRouteError {
+  name = "NoResponseFromHandlerError";
 }
 export class TimeoutError extends NextApiRouteError {
   name = "TimeoutError";
