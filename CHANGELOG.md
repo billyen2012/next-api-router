@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.3.2
+
+### Patch Changes
+
+- fix form() parser error when uploading a file
+
 ## 1.3.1
 
 ### Patch Changes

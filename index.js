@@ -64,21 +64,24 @@ const getUniqueUrlParamsRegister = (urlParts = []) => {
  * @param {string} value
  */
 const parseParam = (value) => {
-  // handle num case
-  const validNumberRegex = /^(\d+(\.\d*)?|\.\d+)$/;
-  if (validNumberRegex.test(value)) {
-    if (value > Number.MAX_SAFE_INTEGER) {
-      return value;
+  if (typeof value === "string") {
+    // handle num case
+    const validNumberRegex = /^(\d+(\.\d*)?|\.\d+)$/;
+    if (validNumberRegex.test(value)) {
+      if (value > Number.MAX_SAFE_INTEGER) {
+        return value;
+      }
+      return Number(value);
     }
-    return Number(value);
-  }
-  // handle boolean case
-  const truthyStr = value.toLocaleLowerCase();
-  if (["true", "false"].includes(truthyStr)) {
-    return truthyStr === "true";
+    // handle boolean case
+    const truthyStr = value.toLocaleLowerCase();
+    if (["true", "false"].includes(truthyStr)) {
+      return truthyStr === "true";
+    }
+    return decodeURIComponent(value);
   }
   // any other case
-  return decodeURIComponent(value);
+  return value;
 };
 
 /**
