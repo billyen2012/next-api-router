@@ -1,10 +1,11 @@
 {
   "name": "@billyen2012/next-api-router",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "A next.js api router that feels like express.js",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "homepage": "https://billyen2012.github.io/next-api-router-home-page",
   "scripts": {
     "test": "jest ./index",
     "exe": "babel-node",

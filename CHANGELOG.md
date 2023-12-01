@@ -1,5 +1,12 @@
 # @billyen2012/next-api-router
 
+## 1.3.1
+
+### Patch Changes
+
+- update readme
+- add homepage link
+
 ## 1.3.0
 
 ### Minor Changes

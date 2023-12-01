@@ -1,12 +1,18 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745612/nmlcwzxjzqz47n3ggie4.png">
-    <img src="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745689/dmkxww0uuhgw7h4p6sc7.png" height="128">
-  </picture>
+  <a href="https://billyen2012.github.io/next-api-router-home-page" target="_blank">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745612/nmlcwzxjzqz47n3ggie4.png">
+      <img src="https://res.cloudinary.com/dwmca4lse/image/upload/v1700745689/dmkxww0uuhgw7h4p6sc7.png" height="128">
+    </picture>
+  </a>
 </p>
 
 <p align="center">
 A <strong>next.js</strong> api router that feels like <strong>express.js</strong>
+</p>
+
+<p align="center">
+   <a href="https://billyen2012.github.io/next-api-router-home-page" target="_blank">Visit home page here</a> !
 </p>
 
 ## Table of contents
@@ -22,8 +28,7 @@ A <strong>next.js</strong> api router that feels like <strong>express.js</strong
 - [`writeHead(status, headers)`, `writeLine(msg)` and `end(msg)`](#writeheadstatus-headers-writelinemsg-and-endmsg)
 - [URL Params](#url-params)
 - [Query Params](#query-params)
-- [Body Parser](#body-parser)
-- [Headers](#headers)
+  - [Body Parser](#body-parser)
 - [Cookies](#cookies)
 - [Ejs](#ejs)
 - [Error Handler](#error-handler)
@@ -73,7 +78,7 @@ app/
 Then in the `route.js`, add the following
 
 ```js
-import NextApiRouter from "next-api-router";
+import NextApiRouter from "@billyen2012/next-api-router";
 
 const app = NextApiRouter({
   timeout: 20 * 1000,
@@ -114,7 +119,7 @@ And then have you `const export app = NextApiRouter()` created in some other fol
 
 ```js
 
-import NextApiRouter from "next-api-router";
+import NextApiRouter from "@billyen2012/next-api-router";
 
 const app = NextApiRouter();
 
@@ -145,7 +150,7 @@ app.get("/hello",(req, res, next) => {
 
 ```js
 import fs from "fs";
-import NextApiRouter from "next-api-router";
+import NextApiRouter from "@billyen2012/next-api-router";
 
 // if file is a Readable
 app.get("/file", async (req, res) => {
@@ -228,17 +233,21 @@ app.get("/users", (req, res) => {
 });
 ```
 
-## Body Parser
+### Body Parser
 
 - the parse data will be in the `req.data` because `next.js` req.body object is a getter which can not be mutated.
+- the incoming data must indicate the `content-type` in the header, for instance, `app.bodyParser.json()` will parse the data only if `content-type` is `json` (e.g. `application/json`).
+- there are three supported bodyParser, that are `json()`,  `text()` and  `form()`.
+- `form()` will parse either `multipart/form-data` or `urlencoded`.
 
 ```js
 app.use(app.bodyParser.json());
 
 app.post("/users", (req, res) => {
   console.log(req.data);
-  res.send(id)
+  res.send(req.data)
 });
+```
 
 ```
 
@@ -277,7 +286,7 @@ app.get("/", async (req, res, next) => {
 ## Ejs
 
 ```js
-import NextApiRouter from "next-api-router";
+import NextApiRouter from "@billyen2012/next-api-router";
 
 const app = NextApiRouter({ejsFolderPath:"/views"});
 
@@ -388,7 +397,7 @@ Create sub router to allow you separate your routes into different files and cre
 ### If Self-hosted
 
 ```js
-import NextApiRouter from "next-api-router";
+import NextApiRouter from "@billyen2012/next-api-router";
 
 const router = NextApiRouter()
 
@@ -402,7 +411,7 @@ export default router
 And in app `route.js`
 
 ```js
-import NextApiRouter from "next-api-router";
+import NextApiRouter from "@billyen2012/next-api-router";
 import router from '../the-router-you-just-added'
 
 const app = NextApiRouter()
@@ -429,7 +438,7 @@ app/
 ```js
 
 /** in app/api/[...]/route.js */
-import NextApiRouter from "next-api-router";
+import NextApiRouter from "@billyen2012/next-api-router";
 
 const app = NextApiRouter({apiFolderPath:"/api"});
 
@@ -437,7 +446,7 @@ export const GET = app.handler();
 /** ************************ */
 
 /** in app/api/admin/[...]/route.js */
-import NextApiRouter from "next-api-router";
+import NextApiRouter from "@billyen2012/next-api-router";
 
 const app = NextApiRouter({apiFolderPath:"/api/admin"});
 
@@ -493,7 +502,7 @@ export const GET = app.handler();
 
 ```js
 // example reference from https://github.com/hoangvvo/next-session#readme
-import NextApiRouter from "next-api-router";
+import NextApiRouter from "@billyen2012/next-api-router";
 /** for example only, you should put this part in a separate file and import it  */
 import nextSession from "next-session";
 // set autoCommit to false, autoCommit does not work, so you will have to commit change manually
