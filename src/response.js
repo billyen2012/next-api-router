@@ -125,9 +125,6 @@ export class NextApiRouterResponse extends Response {
     this._status = code;
     return this;
   }
-  get statusCode() {
-    return this._status;
-  }
   json(data) {
     this.headers["Content-Type"] = "application/json";
     try {
