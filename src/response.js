@@ -60,6 +60,10 @@ const processPath = (path, fileName = "") => {
  * }}
  */
 const processResponseMessage = (message) => {
+  // null meaning no return body
+  if (message == null) {
+    return { type: "null", message };
+  }
   /** buffer case */
   if (message instanceof Buffer) {
     return { type: "readable", message: new Readable.from(message) };
@@ -91,6 +95,12 @@ export class NextApiRouterResponse extends Response {
   get cookies() {
     return cookies();
   }
+  get statusCode() {
+    return this._status;
+  }
+  get headersSent() {
+    return this._sent;
+  }
   setHeader(name, value) {
     this.headers.set(name, value);
     return this;
@@ -107,9 +117,16 @@ export class NextApiRouterResponse extends Response {
   getHeaders(names = []) {
     return getHeaders.call(this, names);
   }
+  removeHeader(name) {
+    this.headers.delete(name);
+    return this;
+  }
   status(code) {
     this._status = code;
     return this;
+  }
+  get statusCode() {
+    return this._status;
   }
   json(data) {
     this.headers["Content-Type"] = "application/json";
@@ -201,14 +218,12 @@ export class NextApiRouterResponse extends Response {
       this._nextPromiseResolver = null;
     }
   }
-  send(message) {
+  send(message = null) {
     // _nextPromise will be bound from the handler()
     this.resolveNext();
     if (this._redirectUrl) {
       return redirect(this._redirectUrl);
     }
-
-    const { message: processedMessage } = processResponseMessage(message);
 
     const headers = this.getHeaders();
 
@@ -218,12 +233,13 @@ export class NextApiRouterResponse extends Response {
     };
 
     if (!this._sent) {
+      this._startAt = process.hrtime();
       this._sent = true;
+
+      const { message: processedMessage } = processResponseMessage(message);
       this._response = new Response(processedMessage, payloadOptions);
       return;
     }
-
-    // throw new Error("response has already been sent");
   }
   _writeSetup() {
     if (!this._readstream) {

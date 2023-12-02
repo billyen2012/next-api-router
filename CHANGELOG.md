@@ -1,5 +1,12 @@
 # @billyen2012/next-api-router
 
+## 1.3.3
+
+### Patch Changes
+
+- add more internal state for express.js middleware compatibility (now compatible to `helmet`, `cors` , `morgan` and `express-rate-limit`
+- allow send `null` to body
+
 ## 1.3.2
 
 ### Patch Changes

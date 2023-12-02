@@ -42,7 +42,7 @@ A <strong>next.js</strong> api router that feels like <strong>express.js</strong
 
 ## Note
 
-- ⚠️ If you are deploying to Vercel, this might not be a good option since Vercel is a *Serverless Function* and `NextApiRouter` can become an overhead for every single api call. It will be more suitable if you are self-hosted. Otherwise, try not to have every route built in one single file (refer to [here](#sub-router))
+- ⚠️ If you are deploying to Vercel, this might not be a good option since Vercel is a _Serverless Function_ and `NextApiRouter` can become an overhead for every single api call. It will be more suitable if you are self-hosted. Otherwise, try not to have every route built in one single file (refer to [here](#sub-router))
 - This is currently only compatible with new `route api` introduced in `next13`
 - If you are not familiar with `express.js`, learn `express.js` first.
 
@@ -86,13 +86,12 @@ const app = NextApiRouter({
   ejsFolderPath: "/src/app/views", // need include all folder encounter from the route (there is no default value). No need to set this up if you are not using ejs
 });
 
-
 app.get("/hello", (req, res, next) => {
-    res.send("Hello")
+  res.send("Hello");
 });
 
-const handler = app.handler()
-export const dynamic = 'force-dynamic'
+const handler = app.handler();
+export const dynamic = "force-dynamic";
 export const GET = handler;
 export const POST = handler;
 export const PUT = handler;
@@ -118,32 +117,37 @@ And then have you `const export app = NextApiRouter()` created in some other fol
 - Refer to `express.js` for how this works, but the code example should be self explanatory.
 
 ```js
-
 import NextApiRouter from "@billyen2012/next-api-router";
 
 const app = NextApiRouter();
 
-app.use((req, res, next) => {
-  //...
-  console.log("1")
-  next()
-},(req, res, next) => {
-  //...
-  console.log("2")
-  next()
-});
+app.use(
+  (req, res, next) => {
+    //...
+    console.log("1");
+    next();
+  },
+  (req, res, next) => {
+    //...
+    console.log("2");
+    next();
+  }
+);
 
-app.get("/hello",(req, res, next) => {
-  //...
-  console.log("3")
-  res.send()
-  next()
-},(req, res, next) => {
-  console.log("4")
-});
+app.get(
+  "/hello",
+  (req, res, next) => {
+    //...
+    console.log("3");
+    res.send();
+    next();
+  },
+  (req, res, next) => {
+    console.log("4");
+  }
+);
 
 // and console will print 1,2,3,4
-
 ```
 
 ## Send a file
@@ -154,16 +158,16 @@ import NextApiRouter from "@billyen2012/next-api-router";
 
 // if file is a Readable
 app.get("/file", async (req, res) => {
- const file = fs.createReadStream(process.cwd() + "/src/app/file.png");
- // pipe it
- await res.pipe(file);
+  const file = fs.createReadStream(process.cwd() + "/src/app/file.png");
+  // pipe it
+  await res.pipe(file);
 });
 
 // if file is a Buffer or a Readablestream
 app.get("/file", (req, res) => {
- const file = fs.readFileSync(process.cwd() + "/src/app/file.png");
- // just send it
- res.send(file);
+  const file = fs.readFileSync(process.cwd() + "/src/app/file.png");
+  // just send it
+  res.send(file);
 });
 
 const app = NextApiRouter();
@@ -180,46 +184,48 @@ const sleep = (ms) => {
   });
 };
 
-app.get("/writeline",
-/**
- * This callback must not be an async proces.
- * Instead, put everything into a async function locally
- * and call it at the end (just see example below)
- **/
-(req, res, next) => {
-  res.writeHead(200, { "content-type": "text/html" });
+app.get(
+  "/writeline",
+  /**
+   * This callback must not be an async proces.
+   * Instead, put everything into a async function locally
+   * and call it at the end (just see example below)
+   **/
+  (req, res, next) => {
+    res.writeHead(200, { "content-type": "text/html" });
 
-  const run = async () => {
-    res.writeLine("<h3>start</h3>");
-    for (let i = 0; i < 10; i++) {
-      await sleep(200);
-      res.writeLine(`<p>${i}</p>`);
-    }
+    const run = async () => {
+      res.writeLine("<h3>start</h3>");
+      for (let i = 0; i < 10; i++) {
+        await sleep(200);
+        res.writeLine(`<p>${i}</p>`);
+      }
 
-    res.end("<h3>end</h3>");
-  };
+      res.end("<h3>end</h3>");
+    };
 
-  run()
-    // must catch error, otherwise it may cause UnhandledPromiseRejection error
-    .catch((err) => {
-      /**
-       *  do NOT do `catch(next)`, it may not work because as soon as you call res.writeLine() or res.writeHead(), a
-       *  response has already being sent back the client, and the program will assume response was sent to the client
-       *  without error, hence the global error handler will never be triggered.
-       *  Instead, you should pass your error handler directly to here.
-       */
-      console.log(err);
-    });
-});
+    run()
+      // must catch error, otherwise it may cause UnhandledPromiseRejection error
+      .catch((err) => {
+        /**
+         *  do NOT do `catch(next)`, it may not work because as soon as you call res.writeLine() or res.writeHead(), a
+         *  response has already being sent back the client, and the program will assume response was sent to the client
+         *  without error, hence the global error handler will never be triggered.
+         *  Instead, you should pass your error handler directly to here.
+         */
+        console.log(err);
+      });
+  }
+);
 ```
 
 ## URL Params
 
 ```js
 app.get("/users/:userId/post/:postId", (req, res) => {
-  const { userId, postId} = req.params;
-  console.log({ userId, postId})
-  res.json({ userId, postId})
+  const { userId, postId } = req.params;
+  console.log({ userId, postId });
+  res.json({ userId, postId });
 });
 ```
 
@@ -229,7 +235,7 @@ app.get("/users/:userId/post/:postId", (req, res) => {
 app.get("/users", (req, res) => {
   // assume someone send '/users?id=1'
   const { id } = req.query;
-  res.send(id)
+  res.send(id);
 });
 ```
 
@@ -237,7 +243,7 @@ app.get("/users", (req, res) => {
 
 - the parse data will be in the `req.data` because `next.js` req.body object is a getter which can not be mutated.
 - the incoming data must indicate the `content-type` in the header, for instance, `app.bodyParser.json()` will parse the data only if `content-type` is `json` (e.g. `application/json`).
-- there are three supported bodyParser, that are `json()`,  `text()` and  `form()`.
+- there are three supported bodyParser, that are `json()`, `text()` and `form()`.
 - `form()` will parse either `multipart/form-data` or `urlencoded`.
 
 ```js
@@ -245,11 +251,11 @@ app.use(app.bodyParser.json());
 
 app.post("/users", (req, res) => {
   console.log(req.data);
-  res.send(req.data)
+  res.send(req.data);
 });
 ```
 
-```
+````
 
 ## Headers
 
@@ -265,7 +271,7 @@ app.get("/users", (req, res) => {
   res.headers.set("Content-Type", 'image/png');
   res.setHeaders({"content-type":"image/png"})
 });
-```
+````
 
 ## Cookies
 
@@ -282,18 +288,16 @@ app.get("/", async (req, res, next) => {
 });
 ```
 
-
 ## Ejs
 
 ```js
 import NextApiRouter from "@billyen2012/next-api-router";
 
-const app = NextApiRouter({ejsFolderPath:"/views"});
+const app = NextApiRouter({ ejsFolderPath: "/views" });
 
 app.get("/", async (req, res, next) => {
   await res.render("/hello", { firstName: "Foo" });
 });
-
 ```
 
 Example of ejs
@@ -325,7 +329,7 @@ app.get("/render", async (req, res, next) => {
   `,
     { foo: "bar" }
   );
-})
+});
 ```
 
 ## Error Handler
@@ -334,29 +338,27 @@ app.get("/render", async (req, res, next) => {
 - if you override the default error handler, just ensure you cover all the cases.
 
 ```js
-app.errorHandler((err, res, res)=>{
-      // below is default error handler
-      if (err instanceof NotFoundError) {
-        return res.status(404).send("Not found");
-      }
-      if (err instanceof MalformedJsonError) {
-        return res.status(400).send("Malformed json in body's payload");
-      }
-      if (err instanceof TimeoutError) {
-        return res.status(408).send("Request timeout");
-      }
-      if (err instanceof MethodNotAllowedError) {
-        return res.status(405).send("Method not allowed");
-      }
+app.errorHandler((err, res, res) => {
+  // below is default error handler
+  if (err instanceof NotFoundError) {
+    return res.status(404).send("Not found");
+  }
+  if (err instanceof MalformedJsonError) {
+    return res.status(400).send("Malformed json in body's payload");
+  }
+  if (err instanceof TimeoutError) {
+    return res.status(408).send("Request timeout");
+  }
+  if (err instanceof MethodNotAllowedError) {
+    return res.status(405).send("Method not allowed");
+  }
 
-      console.log(err);
+  console.log(err);
 
-      res
-        .status(500)
-        .send(
-          process.env.NODE_ENV === "development" ? err.stack : "Server Error"
-        );
-})
+  res
+    .status(500)
+    .send(process.env.NODE_ENV === "development" ? err.stack : "Server Error");
+});
 ```
 
 ## Global Try/Catch and Catch Async
@@ -364,29 +366,29 @@ app.errorHandler((err, res, res)=>{
 To jump directly to the error handler from any point of your code, you can simply throw an error. This will be handy when doing input validation, authentication, etc.
 
 ```js
-app.use((req,res, next)=>{
-    if(!req.session.user){
-       throw new Error("Not Authorized")
-    }
-    next()
+app.use((req, res, next) => {
+  if (!req.session.user) {
+    throw new Error("Not Authorized");
+  }
+  next();
 });
 ```
 
 If there is any `Promise`, make sure you `await` the promise, or it will cause the unhandled promise rejection.
 
 ```js
-app.use(async (req,res, next)=>{
-    await someAsyncProcess()
-    next()
+app.use(async (req, res, next) => {
+  await someAsyncProcess();
+  next();
 });
 
-app.use(async (req,res, next)=>{
-    // or you can do
-    someAsyncProcess().catch(err=>{
-      // usually you will want to have a custom error handler here, but this is just an example
-      console.log(err)
-    })
-    next()
+app.use(async (req, res, next) => {
+  // or you can do
+  someAsyncProcess().catch((err) => {
+    // usually you will want to have a custom error handler here, but this is just an example
+    console.log(err);
+  });
+  next();
 });
 ```
 
@@ -399,26 +401,26 @@ Create sub router to allow you separate your routes into different files and cre
 ```js
 import NextApiRouter from "@billyen2012/next-api-router";
 
-const router = NextApiRouter()
+const router = NextApiRouter();
 
-router.get("/foo", (req,res)=>{
-  res.send("bar")
-})
+router.get("/foo", (req, res) => {
+  res.send("bar");
+});
 
-export default router
+export default router;
 ```
 
 And in app `route.js`
 
 ```js
 import NextApiRouter from "@billyen2012/next-api-router";
-import router from '../the-router-you-just-added'
+import router from "../the-router-you-just-added";
 
-const app = NextApiRouter()
+const app = NextApiRouter();
 
-app.use("/subroute", router)
+app.use("/subroute", router);
 
-export default router
+export default router;
 ```
 
 ### If Deployed to Vercel
@@ -436,11 +438,10 @@ app/
 ```
 
 ```js
-
 /** in app/api/[...]/route.js */
 import NextApiRouter from "@billyen2012/next-api-router";
 
-const app = NextApiRouter({apiFolderPath:"/api"});
+const app = NextApiRouter({ apiFolderPath: "/api" });
 
 export const GET = app.handler();
 /** ************************ */
@@ -448,7 +449,7 @@ export const GET = app.handler();
 /** in app/api/admin/[...]/route.js */
 import NextApiRouter from "@billyen2012/next-api-router";
 
-const app = NextApiRouter({apiFolderPath:"/api/admin"});
+const app = NextApiRouter({ apiFolderPath: "/api/admin" });
 
 export const GET = app.handler();
 /** ************************ */

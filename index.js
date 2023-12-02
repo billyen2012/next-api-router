@@ -444,6 +444,13 @@ const NextApiRouter = (
        * @param {Request} request
        */
       return async (request) => {
+        // bind internal use state
+        request._startAt = process.hrtime();
+        Object.defineProperty(request, "ip", {
+          get: function () {
+            return this.headers.get("x-forwarded-for") || undefined;
+          },
+        });
         // bind custom methods
         request.getHeader = getHeader.bind(request);
         request.getHeaders = getHeaders.bind(request);

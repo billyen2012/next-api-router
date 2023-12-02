@@ -196,6 +196,7 @@ export type HttpHeadersObject = {
 export declare class NextApiRouterResponse {
   headers: Headers;
   cookies: ReadonlyRequestCookies;
+  _startAt: [number, number];
   setHeader(name: HttpHeaders[number], value: string): this;
   setHeaders(headers: HttpHeadersObject): this;
   status(code: number): this;
@@ -213,8 +214,8 @@ export declare class NextApiRouterResponse {
   end(message?: number | string | Uint8Array): void;
   getHeader(name: HttpHeaders[number]): string;
   getHeaders: typeof GetHeaders;
+  removeHeader(name: string): this;
 }
-
 export declare class NextApiRouteError extends Error {
   constructor(message: string);
   setMessage(value: string): this;
@@ -251,8 +252,10 @@ export type NextApRouterRequest = Request & {
   query: Record<string | number, any>;
   params: Record<string | number, any>;
   data?: any;
+  ip?: string;
   getHeader(name: HttpHeaders[number]): string;
   getHeaders: typeof GetHeaders;
+  _startAt: [number, number];
   // allowing add any prop
   [key: string]: any;
 };
@@ -261,10 +264,17 @@ declare function GetHeaders<T extends string>(
   name?: HttpHeaders[number][] | T[] | string[]
 ): Partial<Record<T, string>>;
 
+export type BodyParserOptions = {
+  /**
+   * refere to  [typeis](https://www.npmjs.com/package/type-is) for more info
+   */
+  type?: string[];
+};
+
 export type BodyParser = {
-  text(): NextApiProcessCallback;
-  json(): NextApiProcessCallback;
-  form(): NextApiProcessCallback;
+  text(options?: BodyParserOptions): NextApiProcessCallback;
+  json(options?: BodyParserOptions): NextApiProcessCallback;
+  form(options?: BodyParserOptions): NextApiProcessCallback;
 };
 
 export type NextApiRouterOptions = {
