@@ -235,7 +235,11 @@ const NextApiRouter = (
     let i = -1;
     for (let urlPart of urlParts) {
       i += 1;
-      const next = currentNode[urlPart] ?? currentNode[QUERY_PARAM_KEY];
+      const next =
+        // sub route has higher priority
+        currentNode[SUB_ROUTES_KEY_PREFIX + "/" + urlPart] ??
+        currentNode[urlPart] ??
+        currentNode[QUERY_PARAM_KEY];
       if (next) {
         // map url part to params if the node is a url param
         if (typeof next.paramsKey !== "undefined") {

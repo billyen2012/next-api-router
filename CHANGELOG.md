@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.3.4
+
+### Patch Changes
+
+- fix sub route more than 1 issue
+
 ## 1.3.3
 
 ### Patch Changes
