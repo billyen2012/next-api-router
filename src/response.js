@@ -117,6 +117,13 @@ export class NextApiRouterResponse extends Response {
   getHeaders(names = []) {
     return getHeaders.call(this, names);
   }
+  /**
+   * for express middleware compatibility only, do not expose to type
+   */
+  set(name, value) {
+    this.setHeader(name, value);
+    return this;
+  }
   removeHeader(name) {
     this.headers.delete(name);
     return this;

@@ -25,6 +25,7 @@ import typeis from "type-is";
 
 const QUERY_PARAM_KEY = `qp_${randomId()}`;
 const BASE_ROUTE_KEY = `base_${randomId()}`;
+const PARENT_ROUTER = `PARENT_ROUTER_${randomId()}`;
 const SUB_ROUTES_KEY_PREFIX = `sub_${randomId()}`;
 const SUPPORTED_HTTP_METHODS = [
   "GET",
@@ -35,6 +36,27 @@ const SUPPORTED_HTTP_METHODS = [
   "OPTIONS",
   "HEAD",
 ];
+
+/**
+ * @param {ReturnType<typeof NextApiRouter>} currentRouter
+ */
+const collectMiddlewaresFromParentRouter = (
+  currentRouter,
+  middlewares = []
+) => {
+  const parent = currentRouter.routable[PARENT_ROUTER];
+
+  if (parent) {
+    middlewares.unshift(...parent._middlewareCollections);
+    return collectMiddlewaresFromParentRouter(parent, middlewares);
+  }
+
+  return (
+    middlewares
+      // remove duplicated callback function before return
+      .filter((item, index) => middlewares.indexOf(item) === index)
+  );
+};
 
 const getParamsRegisterCode = (paramsLocation = [], urlPartsCount) => {
   return `x${paramsLocation.join(",")}y${urlPartsCount}`;
@@ -109,7 +131,9 @@ const NextApiRouter = (
     ejsFolderPath = "",
   } = {}
 ) => {
-  const routable = {};
+  const routable = {
+    [PARENT_ROUTER]: null,
+  };
 
   /**
    * @param {string} method
@@ -145,8 +169,9 @@ const NextApiRouter = (
             ""
           );
 
+        const prev = node;
         node = node[QUERY_PARAM_KEY];
-
+        node.prev = prev;
         continue;
       }
 
@@ -154,7 +179,9 @@ const NextApiRouter = (
         node[part] = {};
       }
 
+      const prev = node;
       node = node[part];
+      node.prev = prev;
     }
 
     // map method
@@ -407,30 +434,39 @@ const NextApiRouter = (
     use(...cbs) {
       // case for mapping sub route
       if (typeof cbs[0] === "string") {
+        /**@type {ReturnType<typeof NextApiRouter>} */
         const subRouter = cbs[cbs.length - 1];
         routable[SUB_ROUTES_KEY_PREFIX + cbs[0]] = subRouter.routable;
         this._subRoutes.push(cbs[0]);
         // push all middleware to subrouter's middleware collection and each node's premiddlewares
-        const middlewares = [];
-        for (let i = 1; i < cbs.length - 1; i++) {
-          middlewares.push(cbs[i]);
+        const middlewares = cbs.slice(1, cbs.length - 1);
+
+        // add current router object into PARENT_ROUTER collection not if exist
+        if (!subRouter.routable[PARENT_ROUTER]) {
+          subRouter.routable[PARENT_ROUTER] = this;
         }
 
-        if (middlewares.length > 0) {
-          subRouter._middlewareCollections.unshift(...middlewares);
-          subRouter._nodeCollections.forEach((node) => {
-            node.preMiddlewares.unshift(
-              // pass middleware already be collected in parent router
-              ...[
-                ...this._middlewareCollections,
-                // then add the child router middlewares
-                ...middlewares,
-              ]
-            );
-          });
-          // this node should also have access to the sub router node
-          this._nodeCollections.push(...subRouter._nodeCollections);
-        }
+        // traverse to all the parent router and add all its collected middlewares as pre-middlewares
+        const preMiddlewares = collectMiddlewaresFromParentRouter(subRouter);
+
+        subRouter._middlewareCollections.unshift(
+          ...preMiddlewares,
+          ...middlewares
+        );
+
+        subRouter._nodeCollections.forEach((node) => {
+          subRouter;
+          node.preMiddlewares.unshift(
+            // pass middleware already be collected in parent router
+            ...[
+              ...preMiddlewares,
+              // then add the child router middlewares
+              ...middlewares,
+            ]
+          );
+        });
+        // this node should also have access to the sub router node
+        this._nodeCollections.push(...subRouter._nodeCollections);
       }
       // case for adding middleware to current router
       else {
@@ -494,9 +530,10 @@ const NextApiRouter = (
         }
 
         // if route does not match, then just run through all middlewares
-        const allCallbacks = callbacks
-          ? [...preMiddlewares, ...callbacks, ...postMiddlewares]
-          : this._middlewareCollections;
+        const allCallbacks =
+          callbacks.length > 0
+            ? [...preMiddlewares, ...callbacks, ...postMiddlewares]
+            : this._middlewareCollections;
 
         let timeoutResolve = null;
         const timeoutPromise = new Promise((resolve) => {

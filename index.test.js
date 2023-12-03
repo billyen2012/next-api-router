@@ -434,3 +434,100 @@ describe("bodyParser", () => {
     expect(Object.keys(request.data).length).toBe(0);
   });
 });
+
+describe("complex routing", () => {
+  const appA = NextApiRouter();
+  const appB = NextApiRouter();
+  const appC = NextApiRouter();
+
+  appA.use((req, res, next) => {
+    req.data = req.data ? req.data.concat("appA") : ["appA"];
+    next();
+  });
+
+  appB.use((req, res, next) => {
+    req.data = req.data ? req.data.concat("appB") : ["appB"];
+    next();
+  });
+
+  appC.use((req, res, next) => {
+    req.data = req.data ? req.data.concat("appC") : ["appC"];
+    next();
+  });
+
+  appC.get(
+    "/test",
+    (req, res, next) => {
+      req.data = req.data ? req.data.concat("appCSchema") : ["appCSchema"];
+      next();
+    },
+    (req, res) => {
+      res.send("OK");
+    }
+  );
+
+  appA.use(
+    "/b",
+    (req, res, next) => {
+      req.data = req.data ? req.data.concat("appASchema") : ["appASchema"];
+      next();
+    },
+    appB
+  );
+
+  appB.use(
+    "/c",
+    (req, res, next) => {
+      req.data = req.data ? req.data.concat("appBSchema") : ["appBSchema"];
+      next();
+    },
+    appC
+  );
+
+  appB.get("/test", (req, res) => {
+    res.send("OK");
+  });
+
+  test("complex routing B", async () => {
+    const request = makeHttpRequest(BASE_URL + "/b/test", {
+      method: "GET",
+    });
+
+    const response = await appA.handler()(request);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("OK");
+    expect(request.data).toBeInstanceOf(Array);
+    expect(request.data.length).toBe(3);
+
+    // check if middleware follow expected sequence
+    const answers = ["appA", "appASchema", "appB"];
+    for (let i = 0; i < request.data.length; i++) {
+      expect(request.data[i]).toBe(answers[i]);
+    }
+  });
+
+  test("complex routing C", async () => {
+    const request = makeHttpRequest(BASE_URL + "/b/c/test", {
+      method: "GET",
+    });
+
+    const response = await appA.handler()(request);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("OK");
+    expect(request.data).toBeInstanceOf(Array);
+    expect(request.data.length).toBe(6);
+    // check if middleware follow expected sequence
+    const answers = [
+      "appA",
+      "appASchema",
+      "appB",
+      "appBSchema",
+      "appC",
+      "appCSchema",
+    ];
+    for (let i = 0; i < request.data.length; i++) {
+      expect(request.data[i]).toBe(answers[i]);
+    }
+  });
+});

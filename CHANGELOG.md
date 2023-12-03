@@ -1,5 +1,16 @@
 # @billyen2012/next-api-router
 
+## 1.4.0
+
+### Minor Changes
+
+- fix middleware issues in complex sequence
+
+### Patch Changes
+
+- add internal state for express.js middelware compatibility
+- fix middelwares not called if 404
+
 ## 1.3.4
 
 ### Patch Changes
