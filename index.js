@@ -23,10 +23,12 @@ import typeis from "type-is";
  * @param {NextApiRouterResponse} response
  */
 
-const QUERY_PARAM_KEY = `qp_${randomId()}`;
-const BASE_ROUTE_KEY = `base_${randomId()}`;
-const PARENT_ROUTER = `PARENT_ROUTER_${randomId()}`;
-const SUB_ROUTES_KEY_PREFIX = `sub_${randomId()}`;
+const INSTANCE_ID = randomId();
+const QUERY_PARAM_KEY = `qp_${INSTANCE_ID}`;
+const BASE_ROUTE_KEY = `base_${INSTANCE_ID}`;
+const PARENT_ROUTER = `parent_router_${INSTANCE_ID}`;
+const SUB_ROUTES_KEY_PREFIX = `sub_${INSTANCE_ID}`;
+const METHODS_KEY = `methods_${INSTANCE_ID}`;
 const SUPPORTED_HTTP_METHODS = [
   "GET",
   "POST",
@@ -169,9 +171,7 @@ const NextApiRouter = (
             ""
           );
 
-        const prev = node;
         node = node[QUERY_PARAM_KEY];
-        node.prev = prev;
         continue;
       }
 
@@ -179,19 +179,21 @@ const NextApiRouter = (
         node[part] = {};
       }
 
-      const prev = node;
       node = node[part];
-      node.prev = prev;
+    }
+
+    if (!node[METHODS_KEY]) {
+      node[METHODS_KEY] = {};
     }
 
     // map method
-    node[method] = {
+    node[METHODS_KEY][method] = {
       callbacks,
       preMiddlewares: [...this._middlewareCollections],
       postMiddlewares: [],
     };
 
-    return node[method];
+    return node[METHODS_KEY][method];
   }
 
   const generateRouteMethod = (methods = []) => {
@@ -281,7 +283,7 @@ const NextApiRouter = (
     }
 
     // move forward to method
-    currentNode = currentNode[method];
+    currentNode = currentNode[METHODS_KEY][method];
 
     // if there is callbacks in currentNode, meaning there is route match
     if (currentNode) {
@@ -441,7 +443,7 @@ const NextApiRouter = (
         // push all middleware to subrouter's middleware collection and each node's premiddlewares
         const middlewares = cbs.slice(1, cbs.length - 1);
 
-        // add current router object into PARENT_ROUTER collection not if exist
+        // add current router object into PARENT_ROUTER collection if not exist
         if (!subRouter.routable[PARENT_ROUTER]) {
           subRouter.routable[PARENT_ROUTER] = this;
         }
@@ -491,6 +493,7 @@ const NextApiRouter = (
             return this.headers.get("x-forwarded-for") || undefined;
           },
         });
+
         // bind custom methods
         request.getHeader = getHeader.bind(request);
         request.getHeaders = getHeaders.bind(request);

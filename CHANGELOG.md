@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.4.1
+
+### Patch Changes
+
+- route method should also suffix/prefix with an instance id to prevent collision
+
 ## 1.4.0
 
 ### Minor Changes
