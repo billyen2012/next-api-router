@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.4.2
+
+### Patch Changes
+
+- fix `json()` set header issue
+
 ## 1.4.1
 
 ### Patch Changes

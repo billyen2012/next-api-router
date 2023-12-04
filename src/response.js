@@ -133,7 +133,7 @@ export class NextApiRouterResponse extends Response {
     return this;
   }
   json(data) {
-    this.headers["Content-Type"] = "application/json";
+    this.headers.set("content-type", "application/json");
     try {
       this.send(JSON.stringify(data));
     } catch {
