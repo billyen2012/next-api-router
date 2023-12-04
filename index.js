@@ -9,6 +9,8 @@ import {
 import { NextApiRouterResponse, getHeader, getHeaders } from "./src/response";
 import { randomId } from "./src/util/randomId";
 import typeis from "type-is";
+import fs from "fs";
+import path from "path";
 /**
  * @callback NextApiProcessCallback
  * @param {Request | {query:{}, params:{}, data:any}} request
@@ -34,6 +36,36 @@ const PARENT_ROUTER = `parent_router_${INSTANCE_ID}`;
 const CHILD_ROUTERS = `child_routers_${INSTANCE_ID}`;
 const SUB_ROUTES_KEY_PREFIX = `sub_${INSTANCE_ID}`;
 const METHODS_KEY = `methods_${INSTANCE_ID}`;
+// only the common MIME TYPE
+const FILE_ENDING_TO_MIME_TYPE = {
+  aac: "audio/aac",
+  avi: "video/x-msvideo",
+  bmp: "image/bmp",
+  css: "text/css",
+  csv: "text/csv",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  gif: "image/gif",
+  html: "text/html",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  js: "application/javascript",
+  json: "application/json",
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  pdf: "application/pdf",
+  png: "image/png",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  svg: "image/svg+xml",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  txt: "text/plain",
+  wav: "audio/wav",
+  webm: "video/webm",
+  xml: "application/xml",
+  zip: "application/zip",
+};
 const SUPPORTED_HTTP_METHODS = [
   "GET",
   "POST",
@@ -43,6 +75,32 @@ const SUPPORTED_HTTP_METHODS = [
   "OPTIONS",
   "HEAD",
 ];
+
+const getAllFilesInDirectory = (directoryPath) => {
+  const absolutePath = path.resolve(directoryPath);
+
+  let filesArray = [];
+
+  const queue = [absolutePath];
+
+  while (queue.length > 0) {
+    const currentDirectory = queue.shift();
+    const files = fs.readdirSync(currentDirectory);
+
+    files.forEach((file) => {
+      const filePath = path.join(currentDirectory, file);
+      const relativePath = path.relative(absolutePath, filePath);
+
+      if (fs.statSync(filePath).isDirectory()) {
+        queue.push(filePath);
+      } else {
+        filesArray.push(relativePath);
+      }
+    });
+  }
+
+  return filesArray;
+};
 
 /**
  * @param {RouterInstance} currentRouter
@@ -306,27 +364,30 @@ const NextApiRouter = (
       }
     }
 
-    // move forward to method
+    // if METHODS_KEY does not exist, meaning there is no method map to that route
+    if (typeof currentNode[METHODS_KEY] === "undefined") {
+      return { err: new NotFoundError() };
+    }
+
+    if (typeof currentNode[METHODS_KEY][method] === "undefined") {
+      return { err: new MethodNotAllowedError() };
+    }
+
     currentNode = currentNode[METHODS_KEY][method];
 
-    // if there is callbacks in currentNode, meaning there is route match
-    if (currentNode) {
-      const params = {};
-      // mapping params
-      if (paramsCollection.length > 0) {
-        const urlParamsRegister = getParamsRegisterCode(
-          paramsLocation,
-          urlPartsCount
-        );
-        paramsCollection.forEach((item) => {
-          const [paramsKeyObj, value] = item;
-          params[paramsKeyObj[urlParamsRegister]] = value;
-        });
-      }
-      return { ...currentNode, params };
+    const params = {};
+    // mapping params
+    if (paramsCollection.length > 0) {
+      const urlParamsRegister = getParamsRegisterCode(
+        paramsLocation,
+        urlPartsCount
+      );
+      paramsCollection.forEach((item) => {
+        const [paramsKeyObj, value] = item;
+        params[paramsKeyObj[urlParamsRegister]] = value;
+      });
     }
-    // nothing matched, return undefined
-    return { err: new MethodNotAllowedError() };
+    return { ...currentNode, params };
   };
 
   return {
@@ -510,6 +571,37 @@ const NextApiRouter = (
             });
             router._middlewareCollections.push(cb);
           });
+        });
+      }
+      return this;
+    },
+    /**
+     *
+     * @param {string} route relative route path
+     * @param {string} folderPath absolute path to the folder
+     * @param {object} headers
+     * @returns
+     */
+    static(route = "", folderPath = "", headers = {}) {
+      if (!route.startsWith("/")) {
+        route = "/" + route;
+      }
+
+      const filesDirs = getAllFilesInDirectory(folderPath);
+      for (let fileDir of filesDirs) {
+        this.get(route + "/" + fileDir, async (req, res, next) => {
+          // make the best guess to the header content-type based on file-ending.
+          const parts = fileDir.split(".");
+          const fileEnding = parts[parts.length - 1];
+          res.setHeader(
+            "content-type",
+            FILE_ENDING_TO_MIME_TYPE[fileEnding] ?? ""
+          );
+          // user override
+          res.setHeaders(headers);
+          // stream file to the client
+          const stream = fs.createReadStream(folderPath + "/" + fileDir);
+          await res.pipe(stream);
         });
       }
       return this;

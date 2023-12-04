@@ -306,6 +306,7 @@ export interface NextApiRouterType {
   setEjsFolderPath(value: string): this;
   handler(): (req: Request) => Promise<Response>;
   getHeader(name: string): string;
+  static(route: string, folderPath: string, headers?: HttpHeadersObject): this;
 }
 
 export default function NextApiRouter(

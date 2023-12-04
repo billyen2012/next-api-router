@@ -1,5 +1,15 @@
 # @billyen2012/next-api-router
 
+## 1.5.0
+
+### Minor Changes
+
+- add `static()` method for serving static files
+
+### Patch Changes
+
+- fix bug of route not found and metho not allow issue
+
 ## 1.4.3
 
 ### Patch Changes
