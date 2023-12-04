@@ -8,7 +8,7 @@
 
 ### Patch Changes
 
-- fix bug of route not found and metho not allow issue
+- fix bug of route-not-found and method-not-allow issue
 
 ## 1.4.3
 
