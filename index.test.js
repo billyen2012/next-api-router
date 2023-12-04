@@ -1,11 +1,16 @@
+import App from "next/app";
 import NextApiRouter, {
   MalformedJsonError,
   MethodNotAllowedError,
   NotFoundError,
   TimeoutError,
+  collectAllChildRouters,
 } from "./index";
 import { makeHttpRequest } from "./src/util/makeHttpRequest";
 import { sleep } from "./src/util/sleep";
+import { NextApiRouteError } from "./src/errors";
+import { NextApiRouterResponse } from "./src/response";
+import { Readable } from "stream";
 
 const BASE_URL = "http://localhost:3000/api";
 const TEST_TIME_OUT_ROUTE = "/timeout";
@@ -150,6 +155,88 @@ describe("https methods", () => {
         expect(request.data).toBe("ALL");
       });
     }
+  });
+});
+
+describe("Basics of NextApiResponse class", () => {
+  const response = new NextApiRouterResponse();
+  test("setHeader() can set header of the response", () => {
+    response.setHeader("content-type", "random-type");
+    expect(response.headers.get("content-type")).toBe("random-type");
+  });
+
+  test("set() can also header of the response", () => {
+    response.set("content-type", "random-type");
+    expect(response.headers.get("content-type")).toBe("random-type");
+  });
+
+  test("setHeaders() can muliple headers of the response", () => {
+    response.setHeaders({
+      "content-type": "random-type",
+      "content-length": "100",
+    });
+    expect(response.headers.get("content-type")).toBe("random-type");
+    expect(response.headers.get("content-length")).toBe("100");
+  });
+
+  test("json() will enforced application/json contet-type in header", () => {
+    response.json({ foo: "bar" });
+    expect(response.headers.get("content-type")).toBe("application/json");
+  });
+
+  test("getHeader() can set header of the response", () => {
+    response.setHeader("content-type", "random-type");
+    expect(response.getHeader("content-type")).toBe("random-type");
+  });
+
+  test("getHeaders() can muliple headers of the response", () => {
+    response.setHeaders({
+      "content-type": "random-type",
+      "content-length": "100",
+    });
+
+    const headers = response.getHeaders(["content-type", "content-length"]);
+    expect(headers["content-type"]).toBe("random-type");
+    expect(headers["content-length"]).toBe("100");
+  });
+
+  test("redirect() will set _redirectUrl and send", () => {
+    response.redirect("/some/where");
+
+    expect(response._redirectUrl).toBe("/some/where");
+    expect(response._sent).toBe(true);
+  });
+
+  test("status() will update status code", () => {
+    response.status(300);
+    expect(response.statusCode).toBe(300);
+  });
+
+  test("removeHeader() can remove header", () => {
+    response.setHeader("content-type", "random-type");
+    response.removeHeader("content-type");
+    expect(response.headers.get("content-type")).toBe(null);
+  });
+
+  test("send() will set Response object to _response", () => {
+    response.send("test");
+    expect(response._sent).toBe(true);
+    expect(response._response).toBeInstanceOf(Response);
+  });
+
+  test("pipe() can take Readable", async () => {
+    await response.pipe(new Readable());
+    expect(response._response).toBeInstanceOf(Response);
+  });
+
+  test("pipe() can take a ReadableStream", async () => {
+    await response.pipe(new ReadableStream());
+    expect(response._response).toBeInstanceOf(Response);
+  });
+
+  test("pipe() type other than Readable or ReadableStream will throw error", async () => {
+    const err = await response.pipe("not a readable").catch((err) => err);
+    expect(err).toBeInstanceOf(Error);
   });
 });
 
@@ -439,7 +526,8 @@ describe("complex routing", () => {
   const appA = NextApiRouter();
   const appB = NextApiRouter();
   const appC = NextApiRouter();
-
+  const appD = NextApiRouter();
+  const appE = NextApiRouter();
   appA.use((req, res, next) => {
     req.data = req.data ? req.data.concat("appA") : ["appA"];
     next();
@@ -453,6 +541,35 @@ describe("complex routing", () => {
   appC.use((req, res, next) => {
     req.data = req.data ? req.data.concat("appC") : ["appC"];
     next();
+  });
+
+  appD.use((req, res, next) => {
+    req.data = req.data ? req.data.concat("appD") : ["appD"];
+    next();
+  });
+
+  appE.use((req, res, next) => {
+    req.data = req.data ? req.data.concat("appE") : ["appE"];
+    next();
+  });
+
+  appA.use("/d", appD);
+
+  appD.use("/e", appE);
+
+  appE.get("/test", (req, res, next) => {
+    req.data = req.data ? req.data.concat("appECb") : ["appECb"];
+    next();
+  });
+
+  appE.use((req, res, next) => {
+    req.data = req.data ? req.data.concat("appEpost") : ["appEpost"];
+    next();
+  });
+
+  appD.use((req, res, next) => {
+    req.data = req.data ? req.data.concat("appDpost") : ["appDpost"];
+    res.send("OK");
   });
 
   appC.get(
@@ -528,6 +645,55 @@ describe("complex routing", () => {
     ];
     for (let i = 0; i < request.data.length; i++) {
       expect(request.data[i]).toBe(answers[i]);
+    }
+  });
+
+  test("complex routing D", async () => {
+    const request = makeHttpRequest(BASE_URL + "/d/e/test", {
+      method: "GET",
+    });
+
+    const response = await appA.handler()(request);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("OK");
+    expect(request.data).toBeInstanceOf(Array);
+    expect(request.data.length).toBe(6);
+    // check if middleware follow expected sequence
+    const answers = ["appA", "appD", "appE", "appECb", "appEpost", "appDpost"];
+    for (let i = 0; i < request.data.length; i++) {
+      expect(request.data[i]).toBe(answers[i]);
+    }
+  });
+});
+
+describe("Test NextApiRouteError class", () => {
+  test("can set message and name with setMessage() and setName()", async () => {
+    const error = new NextApiRouteError();
+    expect(error.setMessage("test")).toBeInstanceOf(NextApiRouteError);
+    expect(error.setName("TEST_ERROR")).toBeInstanceOf(NextApiRouteError);
+    expect(error.message).toBe("test");
+    expect(error.name).toBe("TEST_ERROR");
+  });
+});
+
+describe("test functions", () => {
+  test("collectAllChildRouters() should return all the child router instances", () => {
+    const app1 = NextApiRouter();
+    const app2 = NextApiRouter();
+    const app3 = NextApiRouter();
+    const app4 = NextApiRouter();
+    const app5 = NextApiRouter();
+
+    app1.use("/a", app2);
+    app2.use("/c", app3);
+    app1.use("/d", app4);
+    app3.use("/e", app5);
+
+    const nodes = collectAllChildRouters(app1);
+    expect(nodes.length).toBe(4);
+    for (let node of [app2, app3, app4, app5]) {
+      expect(nodes.includes(node)).toBe(true);
     }
   });
 });

@@ -1,5 +1,12 @@
 # @billyen2012/next-api-router
 
+## 1.4.3
+
+### Patch Changes
+
+- fix `res.redirect()` issue
+- fix child router not picking up post-middleware from the parent
+
 ## 1.4.2
 
 ### Patch Changes

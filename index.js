@@ -23,10 +23,15 @@ import typeis from "type-is";
  * @param {NextApiRouterResponse} response
  */
 
+/**
+ * @typedef {ReturnType<typeof NextApiRouter>} RouterInstance
+ */
+
 const INSTANCE_ID = randomId();
 const QUERY_PARAM_KEY = `qp_${INSTANCE_ID}`;
 const BASE_ROUTE_KEY = `base_${INSTANCE_ID}`;
 const PARENT_ROUTER = `parent_router_${INSTANCE_ID}`;
+const CHILD_ROUTERS = `child_routers_${INSTANCE_ID}`;
 const SUB_ROUTES_KEY_PREFIX = `sub_${INSTANCE_ID}`;
 const METHODS_KEY = `methods_${INSTANCE_ID}`;
 const SUPPORTED_HTTP_METHODS = [
@@ -40,7 +45,7 @@ const SUPPORTED_HTTP_METHODS = [
 ];
 
 /**
- * @param {ReturnType<typeof NextApiRouter>} currentRouter
+ * @param {RouterInstance} currentRouter
  */
 const collectMiddlewaresFromParentRouter = (
   currentRouter,
@@ -58,6 +63,24 @@ const collectMiddlewaresFromParentRouter = (
       // remove duplicated callback function before return
       .filter((item, index) => middlewares.indexOf(item) === index)
   );
+};
+
+/**
+ * bfs to traverse through all childs routers
+ * @param {RouterInstance} currentRouter
+ * @returns
+ */
+export const collectAllChildRouters = (currentRouter) => {
+  const queue = [...currentRouter.routable[CHILD_ROUTERS]];
+
+  const collection = [];
+  while (queue.length > 0) {
+    const childRouter = queue.pop();
+    collection.push(childRouter);
+    queue.push(...childRouter.routable[CHILD_ROUTERS]);
+  }
+
+  return collection;
 };
 
 const getParamsRegisterCode = (paramsLocation = [], urlPartsCount) => {
@@ -135,6 +158,7 @@ const NextApiRouter = (
 ) => {
   const routable = {
     [PARENT_ROUTER]: null,
+    [CHILD_ROUTERS]: [],
   };
 
   /**
@@ -448,6 +472,11 @@ const NextApiRouter = (
           subRouter.routable[PARENT_ROUTER] = this;
         }
 
+        // and add current router as it's child if not exist
+        if (!this.routable[CHILD_ROUTERS].includes(subRouter)) {
+          this.routable[CHILD_ROUTERS].push(subRouter);
+        }
+
         // traverse to all the parent router and add all its collected middlewares as pre-middlewares
         const preMiddlewares = collectMiddlewaresFromParentRouter(subRouter);
 
@@ -472,11 +501,15 @@ const NextApiRouter = (
       }
       // case for adding middleware to current router
       else {
+        // get collection of current router + all its child routers
+        const routers = [this, ...collectAllChildRouters(this)];
         cbs.forEach((cb) => {
-          this._nodeCollections.forEach((node) => {
-            node.postMiddlewares.push(cb);
+          routers.forEach((router) => {
+            router._nodeCollections.forEach((node) => {
+              node.postMiddlewares.push(cb);
+            });
+            router._middlewareCollections.push(cb);
           });
-          this._middlewareCollections.push(cb);
         });
       }
       return this;
@@ -503,6 +536,7 @@ const NextApiRouter = (
           reqOrigin: reqUrlObj.origin,
           ejsFolderPath: this.ejsFolderPath,
         });
+        response._requestNextUrl = request.nextUrl;
 
         // match url parts to the routable and call middleware and route cb in sequences
         const {

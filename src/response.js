@@ -1,6 +1,5 @@
 import { Readable } from "stream";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import fs from "fs";
 import ejs from "ejs";
 
@@ -92,6 +91,8 @@ export class NextApiRouterResponse extends Response {
   _setContentType = null;
   _sent = null;
   _response = null;
+  /**@type {URL} */
+  _requestNextUrl = null;
   get cookies() {
     return cookies();
   }
@@ -142,7 +143,6 @@ export class NextApiRouterResponse extends Response {
   }
   redirect(url) {
     this._redirectUrl = url;
-    this.redirected = true;
     // trigger send
     this.send();
   }
@@ -225,8 +225,24 @@ export class NextApiRouterResponse extends Response {
   send(message = null) {
     // _nextPromise will be bound from the handler()
     this.resolveNext();
-    if (this._redirectUrl) {
-      return redirect(this._redirectUrl);
+    if (this._redirectUrl && !this._sent) {
+      this._sent = true;
+
+      if (
+        typeof this._redirectUrl === "string" &&
+        this._redirectUrl.startsWith("/")
+      ) {
+        const url = this._requestNextUrl;
+        url.pathname = this._redirectUrl;
+        this._response = Response.redirect(url, this.statusCode || 302);
+        return;
+      }
+
+      this._response = Response.redirect(
+        this._redirectUrl,
+        this.statusCode || 302
+      );
+      return;
     }
 
     const headers = this.getHeaders();
