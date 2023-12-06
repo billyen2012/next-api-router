@@ -251,7 +251,8 @@ export interface NextApiErrorHandlerCallback {
   (
     err: Error | NextApiRouteError,
     req: NextApiRouterRequest,
-    res: NextApiRouterResponse
+    res: NextApiRouterResponse,
+    next: NextCallback
   ): void;
 }
 

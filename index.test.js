@@ -759,8 +759,9 @@ describe(
     });
 
     const app3 = NextApiRouter();
-    app3.errorHandler((err, req, res) => {
+    app3.errorHandler((err, req, res, next) => {
       err.message += "app3";
+      next();
     });
     app3.get("/test", (req, res) => {
       throw new Error("");
@@ -776,18 +777,31 @@ describe(
     });
 
     const app5 = NextApiRouter();
-    app5.errorHandler((err, req, res) => {
+    app5.errorHandler((err, req, res, next) => {
       err.message += "app5";
+      next();
     });
     app5.get("/test", (req, res) => {
       throw new Error("");
     });
 
+    const app6 = NextApiRouter();
+    app6.errorHandler((err, req, res, next) => {
+      err.message += "app5";
+      next(new Error("override"));
+    });
+    app6.get("/test", (req, res) => {
+      throw new Error("");
+    });
+
     app1.use("/1", app2);
+
     app2.use("/2", app3);
     app2.use("/2-2", app4);
     app3.use("/3", app4);
     app4.use("/4", app5);
+
+    app1.use("/6", app6);
 
     test("app2 should push error to app1 since app1 is outter most parent and app2 error handler is not set", async () => {
       const request = makeHttpRequest(BASE_URL + "/1/test", {
@@ -819,6 +833,14 @@ describe(
       });
       const response = await app1.handler()(request);
       expect(await response.text()).toBe("app5app4");
+    });
+
+    test("next(err) will override the err object pass to the next error handler", async () => {
+      const request = makeHttpRequest(BASE_URL + "/6/test", {
+        method: "GET",
+      });
+      const response = await app1.handler()(request);
+      expect(await response.text()).toBe("overrideapp1");
     });
   }
 );

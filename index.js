@@ -105,6 +105,36 @@ const getAllFilesInDirectory = (directoryPath) => {
   return filesArray;
 };
 
+const makeNext = (response) => {
+  const state = {
+    shouldNext: false,
+    nextReceivedError: null,
+  };
+  // create a promise to be resolved outside for next() trigger
+  const nextPromise = new Promise((resolve) => {
+    response._nextPromiseResolver = resolve;
+  });
+
+  response._nextPromise = nextPromise;
+
+  const next = (err = undefined) => {
+    response.resolveNext();
+    // call to resolve promise
+    Promise.resolve(nextPromise);
+    if (err instanceof Error) {
+      state.nextReceivedError = err;
+      return;
+    }
+    state.shouldNext = true;
+  };
+
+  return {
+    next,
+    nextPromise,
+    state,
+  };
+};
+
 /**
  * @param {RouterInstance} currentRouter
  */
@@ -446,7 +476,14 @@ const NextApiRouter = (
     const errorHandlers = collectErrorHandler(router);
 
     for (let handler of errorHandlers) {
-      await handler(err, req, res);
+      const { state, next, nextPromise } = makeNext(res);
+
+      await Promise.all([handler(err, req, res, next), nextPromise]);
+
+      // override error if error is passed to next()
+      if (state.nextReceivedError instanceof Error) {
+        err = state.nextReceivedError;
+      }
       // if received resposne in any of the errorhandler, then just return
       if (res._response) {
         return res._response;
@@ -766,29 +803,11 @@ const NextApiRouter = (
             );
           }
 
-          let shouldNext = false;
-          let nextReceivedError = null;
-          // create a promise to be resolved outside for next() trigger
-          const nextPromise = new Promise((resolve) => {
-            response._nextPromiseResolver = resolve;
-          });
-          const next = (err) => {
-            response.resolveNext();
-            // call to resolve promise
-            Promise.resolve(nextPromise);
-            if (err instanceof Error) {
-              nextReceivedError = err;
-              return;
-            }
-            shouldNext = true;
-          };
-
-          //bind nextPromise to  response object
-          response._nextPromise = nextPromise;
+          const { state, next, nextPromise } = makeNext(response);
 
           await Promise.all([cb(request, response, next), nextPromise]);
 
-          return [shouldNext, nextReceivedError];
+          return [state.shouldNext, state.nextReceivedError];
         };
 
         const exec = () => {

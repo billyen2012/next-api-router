@@ -1,5 +1,21 @@
 # @billyen2012/next-api-router
 
+## 1.6.3
+
+### Patch Changes
+
+- child router's error handler , if set, must call `next()` to move to it's parent error handler. This is to keep the coding style consistent.
+- code refactor
+- cutdown readme section
+
+## 1.6.2
+
+### Patch Changes
+
+- error chaining: all error handlers between the child router (if-set) and outter most parent router will be executed until a response is sent
+- fix method-now-allow issue introduced in v1.6.0
+- timeout value should be getting from the it's own router instance instead of the outter most parent router
+
 ## 1.6.1
 
 ### Patch Changes
