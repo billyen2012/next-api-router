@@ -93,14 +93,28 @@ export class NextApiRouterResponse extends Response {
   _response = null;
   /**@type {URL} */
   _requestNextUrl = null;
-  get cookies() {
-    return cookies();
+  _statusText = null;
+  get statusMessage() {
+    return this._statusText || undefined;
+  }
+  set statusMessage(value) {
+    this._statusText = value;
   }
   get statusCode() {
     return this._status;
   }
+  set statusCode(value) {
+    this._status = value;
+  }
+  get cookies() {
+    return cookies();
+  }
   get headersSent() {
     return this._sent;
+  }
+  setStatusMessage(message) {
+    this.statusMessage = message;
+    return this;
   }
   setHeader(name, value) {
     this.headers.set(name, value);
@@ -247,8 +261,10 @@ export class NextApiRouterResponse extends Response {
 
     const headers = this.getHeaders();
 
+    /**@type {ResponseInit} */
     const payloadOptions = {
       status: this._status || 200,
+      statusText: this.statusMessage,
       headers,
     };
 
@@ -284,15 +300,27 @@ export class NextApiRouterResponse extends Response {
         : String(message)
     );
   }
-  writeHead(statusCode, headers) {
+  writeHead(statusCode, statusMessageOrHeaders, headers) {
     this.status(statusCode);
-    this.setHeaders(headers);
+
+    if (typeof statusMessageOrHeaders === "string") {
+      this.statusMessage = statusMessageOrHeaders;
+      this.setHeaders(headers);
+      this._writeSetup();
+      return this;
+    }
+
+    this.setHeaders(statusMessageOrHeaders);
     this._writeSetup();
     return this;
   }
   writeLine(message = "") {
     this._writeSetup();
     this._processWriteMessage(message);
+    return this;
+  }
+  write(message) {
+    this.writeLine(message);
     return this;
   }
   end(message = "") {

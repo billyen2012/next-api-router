@@ -196,7 +196,10 @@ export type HttpHeadersObject = {
 export declare class NextApiRouterResponse {
   headers: Headers;
   cookies: ReadonlyRequestCookies;
+  statusMessage: string | undefined;
+  statusCode: number | null;
   _startAt: [number, number];
+  setStatusMessage(message: string): this;
   setHeader(name: HttpHeaders[number], value: string): this;
   setHeaders(headers: HttpHeadersObject): this;
   status(code: number): this;
@@ -209,6 +212,12 @@ export declare class NextApiRouterResponse {
     data?: EjsData,
     options?: EjsOptions & { async?: boolean }
   ): Promise<void>;
+  write(message?: number | string | Uint8Array): this;
+  writeHead(
+    statusCode: number,
+    statusText: string,
+    headers?: HttpHeadersObject
+  ): this;
   writeHead(statusCode: number, headers?: HttpHeadersObject): this;
   writeLine(message?: number | string | Uint8Array): this;
   end(message?: number | string | Uint8Array): void;
@@ -232,7 +241,7 @@ export interface NextCallback {
 
 export interface NextApiProcessCallback {
   (
-    req: NextApRouterRequest,
+    req: NextApiRouterRequest,
     res: NextApiRouterResponse,
     next: NextCallback
   ): void;
@@ -241,12 +250,12 @@ export interface NextApiProcessCallback {
 export interface NextApiErrorHandlerCallback {
   (
     err: Error | NextApiRouteError,
-    req: NextApRouterRequest,
+    req: NextApiRouterRequest,
     res: NextApiRouterResponse
   ): void;
 }
 
-export type NextApRouterRequest = Request & {
+export type NextApiRouterRequest = Request & {
   session?: any;
   cookies: ReadonlyRequestCookies;
   query: Record<string | number, any>;

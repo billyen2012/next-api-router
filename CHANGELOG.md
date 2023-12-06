@@ -1,5 +1,18 @@
 # @billyen2012/next-api-router
 
+## 1.6.0
+
+### Minor Changes
+
+- add `setStatusMessage()`
+- add `res.writeHead()` can now take 3 args.
+- add `write()` method
+- add props `statusMessage` and setter for `statusCode` to response
+
+### Patch Changes
+
+- fix naming typo in `.d.ts`
+
 ## 1.5.0
 
 ### Minor Changes

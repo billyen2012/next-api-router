@@ -238,6 +238,50 @@ describe("Basics of NextApiResponse class", () => {
     const err = await response.pipe("not a readable").catch((err) => err);
     expect(err).toBeInstanceOf(Error);
   });
+
+  test("setStatusMessage() can set statusText of response", async () => {
+    const app = NextApiRouter();
+    app.get("/test", (req, res) => {
+      res.setStatusMessage("test");
+      expect(res.statusMessage).toBe("test");
+      res.send("");
+    });
+    const request = makeHttpRequest(BASE_URL + "/test", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    expect(response.statusText).toBe("test");
+  });
+
+  test("writeHeader() can have 3 args, while second arg will modify statusMessage and thrid arg will be headers", async () => {
+    const app = NextApiRouter();
+    app.get("/test", (req, res) => {
+      res.writeHead(201, "test", { "content-length": "100" });
+      expect(res.statusMessage).toBe("test");
+      res.end();
+    });
+    const request = makeHttpRequest(BASE_URL + "/test", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    expect(response.status).toBe(201);
+    expect(response.statusText).toBe("test");
+    expect(response.headers.get("content-length")).toBe("100");
+  });
+
+  test("statusCode set and return the currently status code of the response object", async () => {
+    const app = NextApiRouter();
+    app.get("/test", (req, res) => {
+      res.statusCode = 300;
+      expect(res.statusCode).toBe(300);
+      res.send();
+    });
+    const request = makeHttpRequest(BASE_URL + "/test", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    expect(response.status).toBe(300);
+  });
 });
 
 describe("behaviors", () => {
