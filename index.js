@@ -38,6 +38,7 @@ const CHILD_ROUTERS = `child_routers_${INSTANCE_ID}`;
 const SUB_ROUTES_KEY_PREFIX = `sub_${INSTANCE_ID}`;
 const METHODS_KEY = `methods_${INSTANCE_ID}`;
 const ROUTER_ID_KEY = `router_id_${INSTANCE_ID}`;
+const TIMEOUT_VALUE_KEY = `timeout_${INSTANCE_ID}`;
 // only the common MIME TYPE
 const FILE_ENDING_TO_MIME_TYPE = {
   aac: "audio/aac",
@@ -211,7 +212,7 @@ const shouldParse = ({ req, type }) => {
 const NextApiRouter = (
   // configure default options here directly
   {
-    timeout = 20 * 1000, // 20s
+    timeout, // 20s
     apiFolderPath = "/api",
     ejsFolderPath = "",
   } = {}
@@ -221,6 +222,7 @@ const NextApiRouter = (
     [CURRENT_ROUTER]: null,
     [PARENT_ROUTER]: null,
     [CHILD_ROUTERS]: [],
+    [TIMEOUT_VALUE_KEY]: timeout || 20 * 1000,
   };
 
   /**
@@ -384,11 +386,11 @@ const NextApiRouter = (
 
     // if METHODS_KEY does not exist, meaning there is no method map to that route
     if (typeof currentNode[METHODS_KEY] === "undefined") {
-      return { err: new NotFoundError() };
+      return { err: new NotFoundError(), router: router.current };
     }
 
     if (typeof currentNode[METHODS_KEY][method] === "undefined") {
-      return { err: new MethodNotAllowedError() };
+      return { err: new MethodNotAllowedError(), router: router.current };
     }
 
     currentNode = currentNode[METHODS_KEY][method];
@@ -408,7 +410,51 @@ const NextApiRouter = (
     return { ...currentNode, params, router: router.current };
   };
 
-  routable[CURRENT_ROUTER] = {
+  /**
+   * @param {Error} err
+   * @param {RouterInstance} router
+   * @param {import('.').NextApiRouterRequest} req
+   * @param {NextApiRouterResponse} res
+   */
+  const processRouterError = async (err, router, req, res) => {
+    // first collect all the "set" error handler from current to the outter most parent
+
+    /**
+     * @param {RouterInstance} currentNode
+     * @param {Array<Promise<()=>{}>>} errorHandlers
+     * @returns {Array<Promise<()=>{}>>}
+     */
+    const collectErrorHandler = (currentNode, errorHandlers = []) => {
+      if (!currentNode) {
+        return errorHandlers;
+      }
+
+      if (
+        currentNode._errorHandlerIsSet ||
+        // if PARENT_ROUTER not exist in routable, meaning it is outter most parent router and it's errorhandler is enforced
+        !currentNode.routable[PARENT_ROUTER]
+      ) {
+        errorHandlers.push(currentNode._errorCallback);
+      }
+
+      return collectErrorHandler(
+        currentNode.routable[PARENT_ROUTER],
+        errorHandlers
+      );
+    };
+
+    const errorHandlers = collectErrorHandler(router);
+
+    for (let handler of errorHandlers) {
+      await handler(err, req, res);
+      // if received resposne in any of the errorhandler, then just return
+      if (res._response) {
+        return res._response;
+      }
+    }
+  };
+
+  const currentRouter = {
     get routable() {
       return routable;
     },
@@ -437,6 +483,7 @@ const NextApiRouter = (
           process.env.NODE_ENV === "development" ? err.stack : "Server Error"
         );
     },
+    _errorHandlerIsSet: false,
     routes: [],
     all: generateRouteMethod(SUPPORTED_HTTP_METHODS),
     get: generateRouteMethod(["GET"]),
@@ -451,6 +498,7 @@ const NextApiRouter = (
      */
     errorHandler(cb) {
       this._errorCallback = cb;
+      this._errorHandlerIsSet = true;
       return this;
     },
     apiFolderPath,
@@ -665,7 +713,7 @@ const NextApiRouter = (
         ) ?? {};
 
         if (err instanceof Error) {
-          await this._errorCallback(err, request, response);
+          await processRouterError(err, router, request, response);
           return response._response;
         }
 
@@ -693,15 +741,17 @@ const NextApiRouter = (
           timeoutResolve();
         };
 
+        const routerTimeoutValue = router.routable[TIMEOUT_VALUE_KEY];
+
         const instanceTimeout =
-          typeof timeout === "number"
-            ? setTimeout(handleTimeout, timeout)
+          typeof routerTimeoutValue === "number"
+            ? setTimeout(handleTimeout, routerTimeoutValue)
+            : typeof routerTimeoutValue === "function"
+            ? setTimeout(handleTimeout, routerTimeoutValue(request))
             : undefined;
 
         const cleanUp = () => {
-          if (typeof timeout !== "undefined") {
-            clearTimeout(instanceTimeout);
-          }
+          clearTimeout(instanceTimeout);
         };
         /** ************************************ */
 
@@ -760,7 +810,12 @@ const NextApiRouter = (
 
               if (nextReceivedError) {
                 cleanUp();
-                await this._errorCallback(nextReceivedError, request, response);
+                await processRouterError(
+                  nextReceivedError,
+                  router,
+                  request,
+                  response
+                );
                 return resolve(response._response);
               }
 
@@ -785,9 +840,10 @@ const NextApiRouter = (
         const result = await exec().catch((err) => err);
         /** ************************* */
 
+        cleanUp();
+
         if (result instanceof Error) {
-          cleanUp();
-          await this._errorCallback(result, request, response);
+          await processRouterError(result, router, request, response);
           return response._response;
         }
 
@@ -795,32 +851,34 @@ const NextApiRouter = (
           return result;
         }
 
-        cleanUp();
         // no match route
         if (callbacks.length == 0) {
-          await this._errorCallback(
+          await processRouterError(
             new NotFoundError("Not Found"),
+            router,
             request,
             response
           );
+
           return response._response;
         }
 
-        // no response
-        await this._errorCallback(
+        await processRouterError(
           new NoResponseFromHandlerError(
             `route '${reqUrlObj.pathname}' does not return any response.`
           ),
           request,
           response
         );
+        // no response
 
         return response._response;
       };
     },
   };
 
-  return routable[CURRENT_ROUTER];
+  routable[CURRENT_ROUTER] = currentRouter;
+  return currentRouter;
 };
 
 export default NextApiRouter;

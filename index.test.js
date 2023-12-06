@@ -741,3 +741,84 @@ describe("test functions", () => {
     }
   });
 });
+
+describe(
+  "test error chaining:\n" +
+    "if error happend to child router, it will start from the child router and go all the way to its outter most parent." +
+    "if any router in between has it's errorhandler set, it will be executed until a response is sent",
+  () => {
+    const app1 = NextApiRouter();
+    app1.errorHandler((err, req, res) => {
+      err.message += "app1";
+      res.send(err.message);
+    });
+
+    const app2 = NextApiRouter();
+    app2.get("/test", (req, res) => {
+      throw new Error("");
+    });
+
+    const app3 = NextApiRouter();
+    app3.errorHandler((err, req, res) => {
+      err.message += "app3";
+    });
+    app3.get("/test", (req, res) => {
+      throw new Error("");
+    });
+
+    const app4 = NextApiRouter();
+    app4.errorHandler((err, req, res) => {
+      err.message += "app4";
+      res.send(err.message);
+    });
+    app4.get("/test", (req, res) => {
+      throw new Error("");
+    });
+
+    const app5 = NextApiRouter();
+    app5.errorHandler((err, req, res) => {
+      err.message += "app5";
+    });
+    app5.get("/test", (req, res) => {
+      throw new Error("");
+    });
+
+    app1.use("/1", app2);
+    app2.use("/2", app3);
+    app2.use("/2-2", app4);
+    app3.use("/3", app4);
+    app4.use("/4", app5);
+
+    test("app2 should push error to app1 since app1 is outter most parent and app2 error handler is not set", async () => {
+      const request = makeHttpRequest(BASE_URL + "/1/test", {
+        method: "GET",
+      });
+      const response = await app1.handler()(request);
+      expect(await response.text()).toBe("app1");
+    });
+
+    test("app3 should receive error of app3app1 because app3 error handler is set, app2 is not set and app3 did not return reponse", async () => {
+      const request = makeHttpRequest(BASE_URL + "/1/2/test", {
+        method: "GET",
+      });
+      const response = await app1.handler()(request);
+      expect(await response.text()).toBe("app3app1");
+    });
+
+    test("app4 should receive error of app4 because app4 error handler is set and it does return a response", async () => {
+      const request = makeHttpRequest(BASE_URL + "/1/2-2/test", {
+        method: "GET",
+      });
+      const response = await app1.handler()(request);
+      expect(await response.text()).toBe("app4");
+    });
+
+    test("if chaining app1<=app2<=app3<==app4<==app5, the error thrown in app5 should stop at app4 before app4 will return an error reponse", async () => {
+      const request = makeHttpRequest(BASE_URL + "/1/2/3/4/test", {
+        method: "GET",
+      });
+      const response = await app1.handler()(request);
+      expect(await response.text()).toBe("app5app4");
+    });
+  }
+);
