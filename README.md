@@ -17,7 +17,7 @@ A <strong>next.js</strong> api router that feels like <strong>express.js</strong
 
 ## [Home Page](https://billyen2012.github.io/next-api-router-home-page)
 
-- Please use [home page](https://billyen2012.github.io/next-api-router-home-page) for all api references. It aslo has more info like how to setup Graphql, Swagger, supported express.js middlewares, etc.s
+- Please use [home page](https://billyen2012.github.io/next-api-router-home-page) for all api references. It aslo has more info like how to setup Graphql, Swagger, supported express.js middlewares, etc.
 
 ## Installation
 
