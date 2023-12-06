@@ -1,5 +1,12 @@
 # @billyen2012/next-api-router
 
+## 1.6.1
+
+### Patch Changes
+
+- fixed middleware disappear issue
+- router/sub-router middleware selection
+
 ## 1.6.0
 
 ### Minor Changes

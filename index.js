@@ -33,9 +33,11 @@ const INSTANCE_ID = randomId();
 const QUERY_PARAM_KEY = `qp_${INSTANCE_ID}`;
 const BASE_ROUTE_KEY = `base_${INSTANCE_ID}`;
 const PARENT_ROUTER = `parent_router_${INSTANCE_ID}`;
+const CURRENT_ROUTER = `current_router_${INSTANCE_ID}`;
 const CHILD_ROUTERS = `child_routers_${INSTANCE_ID}`;
 const SUB_ROUTES_KEY_PREFIX = `sub_${INSTANCE_ID}`;
 const METHODS_KEY = `methods_${INSTANCE_ID}`;
+const ROUTER_ID_KEY = `router_id_${INSTANCE_ID}`;
 // only the common MIME TYPE
 const FILE_ENDING_TO_MIME_TYPE = {
   aac: "audio/aac",
@@ -215,6 +217,8 @@ const NextApiRouter = (
   } = {}
 ) => {
   const routable = {
+    [ROUTER_ID_KEY]: randomId(),
+    [CURRENT_ROUTER]: null,
     [PARENT_ROUTER]: null,
     [CHILD_ROUTERS]: [],
   };
@@ -305,6 +309,7 @@ const NextApiRouter = (
    *  callbacks:Array<Promise<()=>{}>>;
    *  preMiddlewares:Array<Promise<()=>{}>>;
    *  postMiddlewares:Array<Promise<()=>{}>>;
+   *  router: RouterInstance
    * } | undefined}
    */
   const getRoutableNodeFromPathname = (
@@ -323,6 +328,10 @@ const NextApiRouter = (
     let currentNode = subRoute
       ? routable[SUB_ROUTES_KEY_PREFIX + subRoute]
       : routable;
+
+    let router = {
+      current: currentNode[CURRENT_ROUTER],
+    };
 
     const urlParts = pathname
       // remove api folder path
@@ -346,11 +355,20 @@ const NextApiRouter = (
     let i = -1;
     for (let urlPart of urlParts) {
       i += 1;
+      // currentNode.routable does exist, meaning it is a sub-router instead of the node a router
+
       const next =
         // sub route has higher priority
         currentNode[SUB_ROUTES_KEY_PREFIX + "/" + urlPart] ??
         currentNode[urlPart] ??
         currentNode[QUERY_PARAM_KEY];
+
+      if (typeof next !== "undefined" && next[CURRENT_ROUTER]) {
+        router = {
+          current: next[CURRENT_ROUTER],
+        };
+      }
+
       if (next) {
         // map url part to params if the node is a url param
         if (typeof next.paramsKey !== "undefined") {
@@ -359,8 +377,8 @@ const NextApiRouter = (
         }
         currentNode = next;
       } else {
-        // no match, return undefined
-        return undefined;
+        // no match, return subRouter
+        return { router: router.current };
       }
     }
 
@@ -387,10 +405,10 @@ const NextApiRouter = (
         params[paramsKeyObj[urlParamsRegister]] = value;
       });
     }
-    return { ...currentNode, params };
+    return { ...currentNode, params, router: router.current };
   };
 
-  return {
+  routable[CURRENT_ROUTER] = {
     get routable() {
       return routable;
     },
@@ -628,6 +646,7 @@ const NextApiRouter = (
           reqOrigin: reqUrlObj.origin,
           ejsFolderPath: this.ejsFolderPath,
         });
+
         response._requestNextUrl = request.nextUrl;
 
         // match url parts to the routable and call middleware and route cb in sequences
@@ -637,6 +656,7 @@ const NextApiRouter = (
           postMiddlewares = [],
           preMiddlewares = [],
           params = {},
+          router,
         } = getRoutableNodeFromPathname(
           method,
           reqUrlObj.pathname,
@@ -662,7 +682,7 @@ const NextApiRouter = (
         const allCallbacks =
           callbacks.length > 0
             ? [...preMiddlewares, ...callbacks, ...postMiddlewares]
-            : this._middlewareCollections;
+            : [...router._middlewareCollections];
 
         let timeoutResolve = null;
         const timeoutPromise = new Promise((resolve) => {
@@ -799,6 +819,8 @@ const NextApiRouter = (
       };
     },
   };
+
+  return routable[CURRENT_ROUTER];
 };
 
 export default NextApiRouter;
