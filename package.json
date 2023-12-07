@@ -1,6 +1,6 @@
 {
   "name": "@billyen2012/next-api-router",
-  "version": "1.6.3",
+  "version": "1.7.0",
   "description": "A next.js api router that feels like express.js",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -28,6 +28,7 @@
   "dependencies": {
     "@types/ejs": "^3.1.5",
     "ejs": "^3.1.9",
+    "etag": "^1.8.1",
     "type-is": "^1.6.18"
   },
   "devDependencies": {

@@ -11,6 +11,21 @@ import { randomId } from "./src/util/randomId";
 import typeis from "type-is";
 import fs from "fs";
 import path from "path";
+import Static from "./src/static";
+import { collectAllChildRouters } from "./src/util/collectAllChildrenRouters";
+import {
+  BASE_ROUTE_KEY,
+  CURRENT_ROUTER,
+  CHILD_ROUTERS,
+  METHODS_KEY,
+  PARENT_ROUTER,
+  QUERY_PARAM_KEY,
+  ROUTER_ID_KEY,
+  SUPPORTED_HTTP_METHODS,
+  TIMEOUT_VALUE_KEY,
+  WILDCARD_KEY,
+} from "./src/instance-constant";
+
 /**
  * @callback NextApiProcessCallback
  * @param {Request | {query:{}, params:{}, data:any}} request
@@ -28,56 +43,6 @@ import path from "path";
 /**
  * @typedef {ReturnType<typeof NextApiRouter>} RouterInstance
  */
-
-const INSTANCE_ID = randomId();
-const QUERY_PARAM_KEY = `qp_${INSTANCE_ID}`;
-const BASE_ROUTE_KEY = `base_${INSTANCE_ID}`;
-const PARENT_ROUTER = `parent_router_${INSTANCE_ID}`;
-const CURRENT_ROUTER = `current_router_${INSTANCE_ID}`;
-const CHILD_ROUTERS = `child_routers_${INSTANCE_ID}`;
-const SUB_ROUTES_KEY_PREFIX = `sub_${INSTANCE_ID}`;
-const METHODS_KEY = `methods_${INSTANCE_ID}`;
-const ROUTER_ID_KEY = `router_id_${INSTANCE_ID}`;
-const TIMEOUT_VALUE_KEY = `timeout_${INSTANCE_ID}`;
-// only the common MIME TYPE
-const FILE_ENDING_TO_MIME_TYPE = {
-  aac: "audio/aac",
-  avi: "video/x-msvideo",
-  bmp: "image/bmp",
-  css: "text/css",
-  csv: "text/csv",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  gif: "image/gif",
-  html: "text/html",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
-  js: "application/javascript",
-  json: "application/json",
-  mp3: "audio/mpeg",
-  mp4: "video/mp4",
-  pdf: "application/pdf",
-  png: "image/png",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  svg: "image/svg+xml",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  txt: "text/plain",
-  wav: "audio/wav",
-  webm: "video/webm",
-  xml: "application/xml",
-  zip: "application/zip",
-};
-const SUPPORTED_HTTP_METHODS = [
-  "GET",
-  "POST",
-  "PUT",
-  "DELETE",
-  "PATCH",
-  "OPTIONS",
-  "HEAD",
-];
 
 const getAllFilesInDirectory = (directoryPath) => {
   const absolutePath = path.resolve(directoryPath);
@@ -154,24 +119,6 @@ const collectMiddlewaresFromParentRouter = (
       // remove duplicated callback function before return
       .filter((item, index) => middlewares.indexOf(item) === index)
   );
-};
-
-/**
- * bfs to traverse through all childs routers
- * @param {RouterInstance} currentRouter
- * @returns
- */
-export const collectAllChildRouters = (currentRouter) => {
-  const queue = [...currentRouter.routable[CHILD_ROUTERS]];
-
-  const collection = [];
-  while (queue.length > 0) {
-    const childRouter = queue.pop();
-    collection.push(childRouter);
-    queue.push(...childRouter.routable[CHILD_ROUTERS]);
-  }
-
-  return collection;
 };
 
 const getParamsRegisterCode = (paramsLocation = [], urlPartsCount) => {
@@ -256,8 +203,9 @@ const NextApiRouter = (
   };
 
   /**
-   * @param {string} method
+   * @param {string | RouterInstance} method
    * @param {string} route
+   * @param {Array<()=>{}>)} callbacks
    */
   function mapRouteToRoutable(method, route, callbacks) {
     const parts = route
@@ -276,6 +224,7 @@ const NextApiRouter = (
     }
 
     for (const part of parts) {
+      // url param, case
       if (part.startsWith(":")) {
         if (!node[QUERY_PARAM_KEY])
           node[QUERY_PARAM_KEY] = {
@@ -302,6 +251,11 @@ const NextApiRouter = (
 
     if (!node[METHODS_KEY]) {
       node[METHODS_KEY] = {};
+    }
+
+    // if method is router instance, map subrouter
+    if (typeof method === "object" && method.routable) {
+      return node;
     }
 
     // map method
@@ -344,22 +298,37 @@ const NextApiRouter = (
    *  router: RouterInstance
    * } | undefined}
    */
-  const getRoutableNodeFromPathname = (
-    method,
-    pathname,
-    apiFolderPath,
-    subRoutes = []
-  ) => {
+  const getRoutableNodeFromPathname = (method, pathname, apiFolderPath) => {
+    const params = {};
+    let paramsLocation = [];
+    let paramsCollection = [];
+    let paramLocationCounter = 0;
+    let offsetX = 0;
+    const processUrlParams = ({ isWildcard = false } = {}) => {
+      if (paramsCollection.length > 0) {
+        const yValue = isWildcard
+          ? paramLocationCounter + 1 // offsetY +1 if is processUrlParams is due to encounter of a wildcard.
+          : paramLocationCounter;
+        const urlParamsRegister = getParamsRegisterCode(
+          paramsLocation.map((num) => num - offsetX),
+          yValue
+        );
+
+        paramsCollection.forEach((item) => {
+          const [paramsKeyObj, value] = item;
+          params[paramsKeyObj[urlParamsRegister]] = value;
+        });
+        offsetX += paramLocationCounter;
+        paramsCollection = [];
+        paramsLocation = [];
+        paramLocationCounter = 0;
+      }
+    };
+
     // remove api folder path
     pathname = pathname.replace(apiFolderPath, "");
-    const subRoute = subRoutes.find((item) => pathname.startsWith(item));
-    if (subRoute) {
-      pathname = pathname.replace(subRoute, "");
-    }
 
-    let currentNode = subRoute
-      ? routable[SUB_ROUTES_KEY_PREFIX + subRoute]
-      : routable;
+    let currentNode = routable;
 
     let router = {
       current: currentNode[CURRENT_ROUTER],
@@ -378,28 +347,33 @@ const NextApiRouter = (
       urlParts.push(BASE_ROUTE_KEY);
     }
 
-    // we don't the paramsLocation yet, so it has to be collected here again
-    const paramsLocation = [];
-    // collect all params and it value in an array
-    const paramsCollection = [];
-    const urlPartsCount = urlParts.length;
+    let wildcardNode = null;
 
-    let i = -1;
-    for (let urlPart of urlParts) {
-      i += 1;
+    for (let i = 0; i < urlParts.length; i++) {
+      const urlPart = urlParts[i];
       // currentNode.routable does exist, meaning it is a sub-router instead of the node a router
-
-      const next =
-        // sub route has higher priority
-        currentNode[SUB_ROUTES_KEY_PREFIX + "/" + urlPart] ??
-        currentNode[urlPart] ??
-        currentNode[QUERY_PARAM_KEY];
-
-      if (typeof next !== "undefined" && next[CURRENT_ROUTER]) {
+      if (currentNode.routable) {
         router = {
-          current: next[CURRENT_ROUTER],
+          current: currentNode,
         };
+        currentNode = currentNode.routable;
+        // if ever encounter a router, then url params must be addressed first
+        processUrlParams();
       }
+
+      const next = currentNode[urlPart] ?? currentNode[QUERY_PARAM_KEY];
+
+      // check if there is wild in current node, if yes, record the first occurance
+      if (currentNode[WILDCARD_KEY] && !wildcardNode) {
+        wildcardNode = currentNode[WILDCARD_KEY];
+        processUrlParams({ isWildcard: true });
+      }
+
+      // if (typeof next !== "undefined" && next[CURRENT_ROUTER]) {
+      //   router = {
+      //     current: next[CURRENT_ROUTER],
+      //   };
+      // }
 
       if (next) {
         // map url part to params if the node is a url param
@@ -408,15 +382,24 @@ const NextApiRouter = (
           paramsLocation.push(i);
         }
         currentNode = next;
-      } else {
-        // no match, return subRouter
-        return { router: router.current };
+        paramLocationCounter++;
+        continue;
       }
+
+      currentNode = next;
+      break;
     }
 
-    // if METHODS_KEY does not exist, meaning there is no method map to that route
-    if (typeof currentNode[METHODS_KEY] === "undefined") {
-      return { err: new NotFoundError(), router: router.current };
+    if (
+      typeof currentNode === "undefined" ||
+      typeof currentNode[METHODS_KEY] === "undefined"
+    ) {
+      // if there is no route found but there is wildcard occurance, set currentNode to the wildcard node
+      if (wildcardNode) {
+        currentNode = wildcardNode;
+      } else {
+        return { err: new NotFoundError(), router: router.current };
+      }
     }
 
     if (typeof currentNode[METHODS_KEY][method] === "undefined") {
@@ -425,18 +408,8 @@ const NextApiRouter = (
 
     currentNode = currentNode[METHODS_KEY][method];
 
-    const params = {};
     // mapping params
-    if (paramsCollection.length > 0) {
-      const urlParamsRegister = getParamsRegisterCode(
-        paramsLocation,
-        urlPartsCount
-      );
-      paramsCollection.forEach((item) => {
-        const [paramsKeyObj, value] = item;
-        params[paramsKeyObj[urlParamsRegister]] = value;
-      });
-    }
+    processUrlParams();
     return { ...currentNode, params, router: router.current };
   };
 
@@ -495,7 +468,6 @@ const NextApiRouter = (
     get routable() {
       return routable;
     },
-    _subRoutes: [],
     _nodeCollections: [],
     _middlewareCollections: [],
     _errorCallback: async (err, req, res) => {
@@ -624,12 +596,18 @@ const NextApiRouter = (
     use(...cbs) {
       // case for mapping sub route
       if (typeof cbs[0] === "string") {
+        if (!cbs[0].startsWith("/")) {
+          cbs[0] = "/" + route;
+        }
         /**@type {ReturnType<typeof NextApiRouter>} */
         const subRouter = cbs[cbs.length - 1];
-        routable[SUB_ROUTES_KEY_PREFIX + cbs[0]] = subRouter.routable;
-        this._subRoutes.push(cbs[0]);
-        // push all middleware to subrouter's middleware collection and each node's premiddlewares
         const middlewares = cbs.slice(1, cbs.length - 1);
+
+        if (subRouter instanceof Static) {
+          return this._mapStatic(cbs[0], subRouter, middlewares);
+        }
+
+        const node = mapRouteToRoutable.call(this, subRouter, cbs[0]);
 
         // add current router object into PARENT_ROUTER collection if not exist
         if (!subRouter.routable[PARENT_ROUTER]) {
@@ -662,6 +640,8 @@ const NextApiRouter = (
         });
         // this node should also have access to the sub router node
         this._nodeCollections.push(...subRouter._nodeCollections);
+
+        Object.assign(node, subRouter);
       }
       // case for adding middleware to current router
       else {
@@ -682,32 +662,38 @@ const NextApiRouter = (
      *
      * @param {string} route relative route path
      * @param {string} folderPath absolute path to the folder
-     * @param {object} headers
+     * @param {import('.').HttpHeadersObject} headers
      * @returns
      */
-    static(route = "", folderPath = "", headers = {}) {
+    static(folderPath = "", headers = {}) {
+      return new Static({ folderPath, headers });
+    },
+    /**
+     *
+     * @param {string} route relative route path
+     * @param {Static} staticIntance absolute path to the folder
+     * @param {import('.').HttpHeadersObject} headers
+     * @returns
+     */
+    _mapStatic(route = "", staticIntance, middlewares = []) {
+      const { folderPath, headers } = staticIntance;
+
       if (!route.startsWith("/")) {
         route = "/" + route;
       }
 
       const filesDirs = getAllFilesInDirectory(folderPath);
       for (let fileDir of filesDirs) {
-        this.get(route + "/" + fileDir, async (req, res, next) => {
-          // make the best guess to the header content-type based on file-ending.
-          const parts = fileDir.split(".");
-          const fileEnding = parts[parts.length - 1];
-          res.setHeader(
-            "content-type",
-            FILE_ENDING_TO_MIME_TYPE[fileEnding] ?? ""
-          );
-          // user override
-          res.setHeaders(headers);
-          // stream file to the client
-          const stream = fs.createReadStream(folderPath + "/" + fileDir);
-          await res.pipe(stream);
-        });
+        this.get(
+          route + "/" + fileDir,
+          ...[
+            ...middlewares,
+            async (req, res, next) => {
+              res.sendFile(folderPath + "/" + fileDir, headers);
+            },
+          ]
+        );
       }
-      return this;
     },
     handler() {
       /**
@@ -730,6 +716,7 @@ const NextApiRouter = (
         const response = new NextApiRouterResponse({
           reqOrigin: reqUrlObj.origin,
           ejsFolderPath: this.ejsFolderPath,
+          req: request,
         });
 
         response._requestNextUrl = request.nextUrl;
@@ -745,8 +732,7 @@ const NextApiRouter = (
         } = getRoutableNodeFromPathname(
           method,
           reqUrlObj.pathname,
-          this.apiFolderPath,
-          this._subRoutes
+          this.apiFolderPath
         ) ?? {};
 
         if (err instanceof Error) {

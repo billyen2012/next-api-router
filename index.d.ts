@@ -1,6 +1,7 @@
 import { type Data as EjsData, type Options as EjsOptions } from "ejs";
 import { type ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
-import { Readable } from "stream";
+import { type Readable } from "stream";
+import type fs from "fs";
 type HttpHeaders = [
   "accept",
   "accept-charset",
@@ -203,6 +204,10 @@ export declare class NextApiRouterResponse {
   setHeader(name: HttpHeaders[number], value: string): this;
   setHeaders(headers: HttpHeadersObject): this;
   status(code: number): this;
+  /**
+   * send static file to client. It will include proper header like content-length, etag, etc.
+   */
+  sendFile(filePath: string, headers?: HttpHeadersObject): Promise<void>;
   json(data: object): this;
   redirect(url: string): void;
   pipe(stream: Readable | ReadableStream): Promise<void>;
@@ -316,7 +321,12 @@ export interface NextApiRouterType {
   setEjsFolderPath(value: string): this;
   handler(): (req: Request) => Promise<Response>;
   getHeader(name: string): string;
-  static(route: string, folderPath: string, headers?: HttpHeadersObject): this;
+  static(
+    folderPath: string,
+    headers?:
+      | HttpHeadersObject
+      | ((stat: fs.Stats, filePath: string, req: NextApiRouterRequest) => {})
+  ): this;
 }
 
 export default function NextApiRouter(

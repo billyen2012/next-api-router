@@ -1,5 +1,19 @@
 # @billyen2012/next-api-router
 
+## 1.7.0
+
+### Minor Changes
+
+- add `res.sendFile()`
+- add wildcard to route detechtion
+- rewrite router-binding-to-router logic to enable more features
+- rewrite `static()`
+- the headers in `static(path, headers)` can now take a callback
+
+### Patch Changes
+
+- code refactor
+
 ## 1.6.3
 
 ### Patch Changes

@@ -2,6 +2,43 @@ import { Readable } from "stream";
 import { cookies } from "next/headers";
 import fs from "fs";
 import ejs from "ejs";
+import etag from "etag";
+import { fileMetaAsync } from "./util/fileMetaAsync";
+import { NotFoundError } from "./errors";
+
+// only the common MIME TYPE
+const FILE_ENDING_TO_MIME_TYPE = {
+  aac: "audio/aac",
+  avi: "video/x-msvideo",
+  bmp: "image/bmp",
+  css: "text/css",
+  csv: "text/csv",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  gif: "image/gif",
+  html: "text/html",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  js: "application/javascript",
+  json: "application/json",
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  pdf: "application/pdf",
+  png: "image/png",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  svg: "image/svg+xml",
+  tif: "image/tiff",
+  tiff: "image/tiff",
+  txt: "text/plain",
+  wav: "audio/wav",
+  webm: "video/webm",
+  xml: "application/xml",
+  zip: "application/zip",
+};
+
+// for cache etag locally
+const eTagMap = new Map();
 
 export function getHeader(name) {
   return this.headers.get(name);
@@ -79,10 +116,17 @@ const processResponseMessage = (message) => {
   return { type: "string", message: String(message) };
 };
 export class NextApiRouterResponse extends Response {
-  constructor({ reqOrigin = null, ejsFolderPath = "", ...restprops } = {}) {
+  constructor({
+    reqOrigin = null,
+    ejsFolderPath = "",
+    req,
+    ...restprops
+  } = {}) {
     super(restprops);
     this._reqOrigin = reqOrigin;
     this._ejsFolderPath = ejsFolderPath;
+    /**@type {import('../index').NextApiRouterRequest} */
+    this._req = req;
   }
   _nextPromiseResolver = null;
   _redirectUrl = null;
@@ -116,10 +160,21 @@ export class NextApiRouterResponse extends Response {
     this.statusMessage = message;
     return this;
   }
+  /**
+   *
+   * @param {import('../index').HttpHeaders[number]} name
+   * @param {string} value
+   * @returns
+   */
   setHeader(name, value) {
     this.headers.set(name, value);
     return this;
   }
+  /**
+   *
+   * @param {import('../index').HttpHeadersObject} headers
+   * @returns
+   */
   setHeaders(headers) {
     for (let key in headers) {
       this.headers.set(key, headers[key]);
@@ -154,6 +209,45 @@ export class NextApiRouterResponse extends Response {
     } catch {
       throw new Error("data is not valid json, can't not be stringify");
     }
+  }
+  async sendFile(filePath, headers = {}) {
+    // use file meta for  header info
+    const fileMeta = await fileMetaAsync(filePath);
+
+    if (fileMeta == false) {
+      throw new NotFoundError();
+    }
+    // set content-length
+    if (typeof fileMeta.size === "number") {
+      this.setHeader("content-length", fileMeta.size);
+    }
+    // set etag
+    const _etag = etag(JSON.stringify(fileMeta), { weak: true });
+    if (typeof fileMeta.size === "number") {
+      this.setHeader("etag", _etag);
+    }
+
+    // make the best guess to the header content-type based on file-ending.
+    const parts = filePath.split(".");
+    const fileEnding = parts[parts.length - 1];
+    this.setHeader("content-type", FILE_ENDING_TO_MIME_TYPE[fileEnding] ?? "");
+    // user override
+    this.setHeaders(
+      typeof headers === "function"
+        ? headers(fileMeta, filePath, this._req)
+        : headers
+    );
+
+    // if etag already exist, return 304
+    if (eTagMap.get(_etag)) {
+      return this.status(304).send();
+    }
+
+    // map new etag
+    eTagMap.set(_etag, true);
+    // stream file to the client
+    const stream = fs.createReadStream(filePath);
+    await this.pipe(stream);
   }
   redirect(url) {
     this._redirectUrl = url;

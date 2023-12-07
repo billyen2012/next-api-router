@@ -1,16 +1,15 @@
-import App from "next/app";
 import NextApiRouter, {
   MalformedJsonError,
   MethodNotAllowedError,
   NotFoundError,
   TimeoutError,
-  collectAllChildRouters,
 } from "./index";
 import { makeHttpRequest } from "./src/util/makeHttpRequest";
 import { sleep } from "./src/util/sleep";
 import { NextApiRouteError } from "./src/errors";
 import { NextApiRouterResponse } from "./src/response";
 import { Readable } from "stream";
+import { collectAllChildRouters } from "./src/util/collectAllChildrenRouters";
 
 const BASE_URL = "http://localhost:3000/api";
 const TEST_TIME_OUT_ROUTE = "/timeout";
@@ -159,18 +158,20 @@ describe("https methods", () => {
 });
 
 describe("Basics of NextApiResponse class", () => {
-  const response = new NextApiRouterResponse();
   test("setHeader() can set header of the response", () => {
+    const response = new NextApiRouterResponse();
     response.setHeader("content-type", "random-type");
     expect(response.headers.get("content-type")).toBe("random-type");
   });
 
   test("set() can also header of the response", () => {
+    const response = new NextApiRouterResponse();
     response.set("content-type", "random-type");
     expect(response.headers.get("content-type")).toBe("random-type");
   });
 
   test("setHeaders() can muliple headers of the response", () => {
+    const response = new NextApiRouterResponse();
     response.setHeaders({
       "content-type": "random-type",
       "content-length": "100",
@@ -180,16 +181,19 @@ describe("Basics of NextApiResponse class", () => {
   });
 
   test("json() will enforced application/json contet-type in header", () => {
+    const response = new NextApiRouterResponse();
     response.json({ foo: "bar" });
     expect(response.headers.get("content-type")).toBe("application/json");
   });
 
   test("getHeader() can set header of the response", () => {
+    const response = new NextApiRouterResponse();
     response.setHeader("content-type", "random-type");
     expect(response.getHeader("content-type")).toBe("random-type");
   });
 
   test("getHeaders() can muliple headers of the response", () => {
+    const response = new NextApiRouterResponse();
     response.setHeaders({
       "content-type": "random-type",
       "content-length": "100",
@@ -201,6 +205,8 @@ describe("Basics of NextApiResponse class", () => {
   });
 
   test("redirect() will set _redirectUrl and send", () => {
+    const response = new NextApiRouterResponse();
+    response._requestNextUrl = new URL("http://localhost:3000/");
     response.redirect("/some/where");
 
     expect(response._redirectUrl).toBe("/some/where");
@@ -208,33 +214,65 @@ describe("Basics of NextApiResponse class", () => {
   });
 
   test("status() will update status code", () => {
+    const response = new NextApiRouterResponse();
     response.status(300);
     expect(response.statusCode).toBe(300);
   });
 
   test("removeHeader() can remove header", () => {
+    const response = new NextApiRouterResponse();
     response.setHeader("content-type", "random-type");
     response.removeHeader("content-type");
     expect(response.headers.get("content-type")).toBe(null);
   });
 
   test("send() will set Response object to _response", () => {
+    const response = new NextApiRouterResponse();
     response.send("test");
     expect(response._sent).toBe(true);
     expect(response._response).toBeInstanceOf(Response);
   });
 
+  describe("sendFile() should send a file to client with have following characteristics", () => {
+    const response = new NextApiRouterResponse();
+    beforeAll(async () => {
+      await response.sendFile(process.cwd() + "/src/test-use/text.txt");
+    });
+
+    test("sendFile() should send a file", async () => {
+      expect(response._response).toBeInstanceOf(Response);
+      expect(await response._response.text()).toBe("test use");
+    });
+
+    test("sendFile() should have etag in header", async () => {
+      expect(response.headers.get("etag")).toBeTruthy();
+    });
+
+    test("sendFile() should have content-length", async () => {
+      expect(response.headers.get("content-length")).toBeTruthy();
+    });
+
+    test("sendFile() should have correct content-type", async () => {
+      const contentType = response.headers.get("content-type");
+      expect(contentType).toBeTruthy();
+      expect(contentType.startsWith("text")).toBeTruthy();
+    });
+  });
+
   test("pipe() can take Readable", async () => {
+    const response = new NextApiRouterResponse();
     await response.pipe(new Readable());
     expect(response._response).toBeInstanceOf(Response);
   });
 
   test("pipe() can take a ReadableStream", async () => {
+    const response = new NextApiRouterResponse();
     await response.pipe(new ReadableStream());
     expect(response._response).toBeInstanceOf(Response);
   });
 
   test("pipe() type other than Readable or ReadableStream will throw error", async () => {
+    const response = new NextApiRouterResponse();
     const err = await response.pipe("not a readable").catch((err) => err);
     expect(err).toBeInstanceOf(Error);
   });
@@ -844,3 +882,157 @@ describe(
     });
   }
 );
+
+describe("test complex middlewares with sub-routers and wildcard", () => {
+  const app1 = NextApiRouter();
+  const app2 = NextApiRouter();
+  const app3 = NextApiRouter();
+
+  test("wildcard should catch all route", async () => {
+    app1.get("/test/*", (req, res) => {
+      res.send();
+    });
+    const request = makeHttpRequest(BASE_URL + "/test/some/random/route", {
+      method: "GET",
+    });
+    const response = await app1.handler()(request);
+    expect(response.status).toBe(200);
+  });
+
+  describe("url param can be processed in `use()` correctly, and a wildcard should not have conflict to the url param", () => {
+    app1.use("/:a/b/:c", app2);
+    app2.use("/:d/e", app3);
+    app3.get("/:f", (req, res) => {
+      res.send("OK");
+    });
+
+    test("url param can be processed in `use()` correctly", async () => {
+      const request = makeHttpRequest(BASE_URL + "/a/b/c/d/e/f", {
+        method: "GET",
+      });
+      const response = await app1.handler()(request);
+      expect(response.status).toBe(200);
+      expect(request.params).not.toBe(undefined);
+      expect(request.params.a).toBe("a");
+      expect(request.params.c).toBe("c");
+      expect(request.params.d).toBe("d");
+      expect(request.params.f).toBe("f");
+    });
+
+    test("wildcard should not have conflict to the url param", async () => {
+      app3.get("/:wild/*", (req, res) => {
+        res.send("OK");
+      });
+      const request = makeHttpRequest(
+        BASE_URL + "/a/b/c/d/e/wild/some/random/route",
+        {
+          method: "GET",
+        }
+      );
+      const response = await app1.handler()(request);
+      expect(response.status).toBe(200);
+      expect(request.params).not.toBe(undefined);
+      expect(request.params.a).toBe("a");
+      expect(request.params.c).toBe("c");
+      expect(request.params.d).toBe("d");
+      expect(request.params.wild).toBe("wild");
+    });
+  });
+});
+
+describe("test static()", () => {
+  const app = NextApiRouter();
+  app.use(
+    "/static",
+    (req, res, next) => {
+      req.data = {
+        static: true,
+      };
+      next();
+    },
+    app.static(process.cwd() + "/src/test-use", { test: "test" })
+  );
+
+  test("middleware should be accessed", async () => {
+    const request = makeHttpRequest(BASE_URL + "/static/text.txt", {
+      method: "GET",
+    });
+    await app.handler()(request);
+    expect(request.data.static).toBeTruthy();
+  });
+
+  test("can acess file in directory", async () => {
+    const request = makeHttpRequest(BASE_URL + "/static/text.txt", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    // the file might have already be read by other test , which will check by etag and return 304 with empty body
+    if (response.status === 304) {
+      expect(response.status).toBe(304);
+      expect(await response.text()).toBe("");
+    } else {
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("test use");
+    }
+  });
+
+  test("can acess file in nested directory", async () => {
+    const request = makeHttpRequest(BASE_URL + "/static/test-static/text.txt", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    if (response.status === 304) {
+      expect(response.status).toBe(304);
+      expect(await response.text()).toBe("");
+    } else {
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("test use");
+    }
+  });
+
+  test("if file not found, it will return 404", async () => {
+    const request = makeHttpRequest(BASE_URL + "/static/directoy/not/exist", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    expect(response.status).toBe(404);
+  });
+
+  test("header can be set by second arg", async () => {
+    const request = makeHttpRequest(BASE_URL + "/static/test-static/text.txt", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    expect(response.headers.get("test")).toBe("test");
+  });
+
+  test("header can be a funtion", async () => {
+    const app = NextApiRouter();
+    app.use(
+      "/static",
+      (req, res, next) => {
+        req.data = {
+          static: true,
+        };
+        next();
+      },
+      app.static(process.cwd() + "/src/test-use", (stats, path, req) => {
+        // will pass the req object
+        expect(req.data.static).toBeTruthy();
+        // will have file path
+        expect(path.split("/").length).toBeGreaterThan(0);
+        // will have file meta
+        expect(stats.isFile()).toBeTruthy();
+        return {
+          test: "test2",
+        };
+      })
+    );
+
+    const request = makeHttpRequest(BASE_URL + "/static/test-static/text.txt", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    expect(response.headers.get("test")).toBe("test2");
+  });
+});
