@@ -1,5 +1,16 @@
 # @billyen2012/next-api-router
 
+## 1.8.0
+
+### Minor Changes
+
+- new feature: allowing return data to be treated as response
+
+### Patch Changes
+
+- in `sendFile()`, unknown file type will use `application/octet-stream` for `content-type` header
+- add more file type for setting content-type of `sendFile()`
+
 ## 1.7.2
 
 ### Patch Changes

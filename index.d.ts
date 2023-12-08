@@ -293,9 +293,14 @@ export type BodyParser = {
 };
 
 export type NextApiRouterOptions = {
+  /**@default 20000 */
   timeout?: number | ((req: NextApiRouterRequest) => number) | boolean;
+  /**@default "/api" */
   apiFolderPath?: string;
+  /**@default null */
   ejsFolderPath?: string;
+  /**@default false */
+  treatReturnAsResponse?: boolean;
 };
 
 export interface NextApiRouterType {
@@ -319,6 +324,7 @@ export interface NextApiRouterType {
   errorHandler(cb: NextApiErrorHandlerCallback): this;
   setApiFolderPath(value: string): this;
   setEjsFolderPath(value: string): this;
+  setTreatReturnAsResponse(value: string): this;
   handler(): (req: Request) => Promise<Response>;
   getHeader(name: string): string;
   static(

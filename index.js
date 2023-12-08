@@ -5,6 +5,7 @@ import {
   NoResponseFromHandlerError,
   TimeoutError,
   MethodNotAllowedError,
+  InvalidReturnDataTypeError,
 } from "./src/errors";
 import { NextApiRouterResponse, getHeader, getHeaders } from "./src/response";
 import { randomId } from "./src/util/randomId";
@@ -459,13 +460,19 @@ const processRouterError = async (err, router, req, res) => {
 
 /**
  *
- * @param {()=>void} cb
+ * @param {Promise<()=>void>} cb
  * @param {import(".").NextApiRouterRequest} request
  * @param {import(".").NextApiRouterResponse} response
  * @param {URL} url
  * @returns
  */
-const handleCb = async (cb, request, response, url) => {
+const handleCb = async (
+  cb,
+  request,
+  response,
+  url,
+  treatReturnAsResponse = false
+) => {
   if (typeof cb !== "function") {
     return new Error(
       `a callback to route ${url.pathname} is not a function, received: ` + cb
@@ -474,9 +481,43 @@ const handleCb = async (cb, request, response, url) => {
 
   const { state, next, nextPromise } = makeNext(response);
 
-  await Promise.all([cb(request, response, next), nextPromise]);
+  const returnedData = await cb(request, response, next);
 
-  return [state.shouldNext, state.nextReceivedError];
+  // handle treating returned data as response and just call send() on behave of user.
+  if (treatReturnAsResponse && !response._sent) {
+    if (returnedData instanceof Error) {
+      next(returnedData);
+    } else if (
+      returnedData instanceof Buffer ||
+      returnedData instanceof ReadableStream
+    ) {
+      response.send(returnedData);
+    } else if (returnedData instanceof fs.ReadStream) {
+      response.pipe(returnedData);
+    } else if (returnedData != this && !response._sent) {
+      switch (typeof returnedData) {
+        case "undefined":
+          break;
+        case "number":
+        case "string":
+          response.send(returnedData);
+          break;
+        case "object":
+          response.json(returnedData);
+        default:
+          next(
+            new InvalidReturnDataTypeError(
+              "returned data type not supported, please ensured " +
+                "your returned data type is either a number, string or object."
+            )
+          );
+      }
+    }
+  }
+
+  await nextPromise;
+
+  return [state.shouldNext, state.nextReceivedError, returnedData];
 };
 
 const NextApiRouter = (
@@ -485,6 +526,7 @@ const NextApiRouter = (
     timeout, // 20s
     apiFolderPath = "/api",
     ejsFolderPath = "",
+    treatReturnAsResponse = false,
   } = {}
 ) => {
   const routable = {
@@ -543,12 +585,17 @@ const NextApiRouter = (
     },
     apiFolderPath,
     ejsFolderPath,
+    treatReturnAsResponse,
     setApiFolderPath(value) {
       this.apiFolderPath = value;
       return this;
     },
     setEjsFolderPath(value) {
       this.ejsFolderPath = value;
+      return this;
+    },
+    setTreatReturnAsResponse(value) {
+      this.treatReturnAsResponse = value;
       return this;
     },
     bodyParser: {
@@ -815,11 +862,21 @@ const NextApiRouter = (
               const result =
                 // if timeoutPromise=undefined, meaning user set timeout=false
                 typeof timeoutPromise === "undefined"
-                  ? await handleCb(cb, request, response, reqUrlObj).catch(
-                      (err) => err
-                    )
+                  ? await handleCb(
+                      cb,
+                      request,
+                      response,
+                      reqUrlObj,
+                      this.treatReturnAsResponse
+                    ).catch((err) => err)
                   : await Promise.race([
-                      handleCb(cb, request, response, reqUrlObj),
+                      handleCb(
+                        cb,
+                        request,
+                        response,
+                        reqUrlObj,
+                        this.treatReturnAsResponse
+                      ),
                       timeoutPromise,
                     ])
                       // enure error is catch in each callback so that user does have
@@ -832,7 +889,7 @@ const NextApiRouter = (
                 return resolve(result);
               }
 
-              const [shouldNext, nextReceivedError] = result;
+              const [shouldNext, nextReceivedError, returnedData] = result;
 
               if (nextReceivedError) {
                 cleanUp();
@@ -916,4 +973,5 @@ export {
   NoResponseFromHandlerError,
   TimeoutError,
   MethodNotAllowedError,
+  InvalidReturnDataTypeError,
 };

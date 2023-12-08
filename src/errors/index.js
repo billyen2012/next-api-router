@@ -25,3 +25,7 @@ export class TimeoutError extends NextApiRouteError {
 export class MethodNotAllowedError extends NextApiRouteError {
   name = "MethodNotAllowedError";
 }
+
+export class InvalidReturnDataTypeError extends NextApiRouteError {
+  name = "InvalidReturnDataTypeError";
+}

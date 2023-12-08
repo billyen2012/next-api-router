@@ -8,6 +8,7 @@ import { NotFoundError } from "./errors";
 
 // only the common MIME TYPE
 const FILE_ENDING_TO_MIME_TYPE = {
+  "7z": "application/x-7z-compressed",
   aac: "audio/aac",
   avi: "video/x-msvideo",
   bmp: "image/bmp",
@@ -21,18 +22,24 @@ const FILE_ENDING_TO_MIME_TYPE = {
   jpg: "image/jpeg",
   js: "application/javascript",
   json: "application/json",
+  jsonld: "application/ld+json",
+  mjs: "text/javascript",
   mp3: "audio/mpeg",
   mp4: "video/mp4",
+  mpeg: "video/mpeg",
   pdf: "application/pdf",
   png: "image/png",
   ppt: "application/vnd.ms-powerpoint",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  rar: "application/vnd.rar",
   svg: "image/svg+xml",
   tif: "image/tiff",
   tiff: "image/tiff",
   txt: "text/plain",
+  vsd: "application/vnd.visio",
   wav: "audio/wav",
   webm: "video/webm",
+  xls: "application/vnd.ms-excel",
   xml: "application/xml",
   zip: "application/zip",
 };
@@ -230,7 +237,9 @@ export class NextApiRouterResponse extends Response {
     // make the best guess to the header content-type based on file-ending.
     const parts = filePath.split(".");
     const fileEnding = parts[parts.length - 1];
-    this.setHeader("content-type", FILE_ENDING_TO_MIME_TYPE[fileEnding] ?? "");
+    const contentType = FILE_ENDING_TO_MIME_TYPE[fileEnding] ?? "";
+    this.setHeader("content-type", contentType || "application/octet-stream");
+
     // user override
     this.setHeaders(
       typeof headers === "function"
