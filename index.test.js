@@ -1052,7 +1052,7 @@ describe("test util", () => {
       expect(Object.keys(obj).length).toBe(0);
     });
 
-    test("if routerTimeoutValue is false, it will return an empty object", async () => {
+    test("if routerTimeoutValue is not false, it should return proper object", async () => {
       const { timeoutInstance, timeoutPromise, timeoutResolve, handleTimeout } =
         makeTimeoutInstance(300);
       expect(typeof handleTimeout).toBe("function");
