@@ -293,7 +293,7 @@ export type BodyParser = {
 };
 
 export type NextApiRouterOptions = {
-  timeout?: number | ((req: NextApiRouterRequest) => number);
+  timeout?: number | ((req: NextApiRouterRequest) => number) | boolean;
   apiFolderPath?: string;
   ejsFolderPath?: string;
 };

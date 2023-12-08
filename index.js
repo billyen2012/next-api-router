@@ -26,6 +26,7 @@ import {
   WILDCARD_KEY,
   RESERVED_ROUTE_NAME_MAP,
 } from "./src/instance-constant";
+import { makeTimeoutInstance } from "./src/util/makeTimeoutInstance";
 
 /**
  * @callback NextApiProcessCallback
@@ -187,6 +188,297 @@ const shouldParse = ({ req, type }) => {
   return true;
 };
 
+/**
+ * @param {string | RouterInstance} method
+ * @param {string} route
+ * @param {Array<()=>{}>)} callbacks
+ */
+function mapRouteToRoutable(method, route, callbacks) {
+  const parts = route
+    .split("/")
+    .map((str) => str.replace(/ /g, ""))
+    .filter((str) => str !== "");
+
+  let node = this.routable;
+
+  // get unique url params register
+  const urlParamsRegister = getUniqueUrlParamsRegister(parts);
+
+  // meaning this an empty route, then push a base route identifier
+  if (parts.length == 0) {
+    parts.push(BASE_ROUTE_KEY);
+  }
+
+  for (const part of parts) {
+    // url param, case
+    if (part.startsWith(":")) {
+      if (!node[QUERY_PARAM_KEY])
+        node[QUERY_PARAM_KEY] = {
+          paramsKey: {
+            [urlParamsRegister]: part.replace(":", ""),
+          },
+        };
+      else
+        node[QUERY_PARAM_KEY].paramsKey[urlParamsRegister] = part.replace(
+          ":",
+          ""
+        );
+
+      node = node[QUERY_PARAM_KEY];
+      continue;
+    }
+
+    if (!node[part]) {
+      node[part] = {};
+    }
+
+    node = node[part];
+  }
+
+  if (!node[METHODS_KEY]) {
+    node[METHODS_KEY] = {};
+  }
+
+  // if method is router instance, map subrouter
+  if (typeof method === "object" && method.routable) {
+    return node;
+  }
+
+  // map method
+  node[METHODS_KEY][method] = {
+    callbacks,
+    preMiddlewares: [...this._middlewareCollections],
+    postMiddlewares: [],
+  };
+
+  return node[METHODS_KEY][method];
+}
+
+const generateRouteMethod = (methods = []) => {
+  /**
+   * @param {string} route
+   * @param {...NextApiProcessCallback[]} callbacks
+   */
+  return function (route, ...callbacks) {
+    for (const method of methods) {
+      this.routes.push(route);
+      // map route and callback
+      const node = mapRouteToRoutable.call(this, method, route, callbacks);
+      this._nodeCollections.push(node);
+    }
+    return this;
+  };
+};
+
+/**
+ * @param {{[x:string]:any}} routable
+ * @param {string} method HTTP method
+ * @param {string} pathname url pathname from new URL()
+ * @param {string} apiFolderPath the path of api folder
+ * @returns {{
+ *  params?:{
+ *     [key:string]:string
+ *  };
+ *  callbacks:Array<Promise<()=>{}>>;
+ *  preMiddlewares:Array<Promise<()=>{}>>;
+ *  postMiddlewares:Array<Promise<()=>{}>>;
+ *  router: RouterInstance
+ * } | undefined}
+ */
+const getRoutableNodeFromPathname = (
+  routable,
+  method,
+  pathname,
+  apiFolderPath
+) => {
+  const params = {};
+  let paramsLocation = [];
+  let paramsCollection = [];
+  let paramLocationCounter = 0;
+  let offsetX = 0;
+  const processUrlParams = ({ isWildcard = false } = {}) => {
+    if (paramsCollection.length > 0) {
+      const yValue = isWildcard
+        ? paramLocationCounter + 1 // offsetY +1 if is processUrlParams is due to encounter of a wildcard.
+        : paramLocationCounter;
+      const urlParamsRegister = getParamsRegisterCode(
+        paramsLocation.map((num) => num - offsetX),
+        yValue
+      );
+
+      paramsCollection.forEach((item) => {
+        const [paramsKeyObj, value] = item;
+        params[paramsKeyObj[urlParamsRegister]] = value;
+      });
+      offsetX += paramLocationCounter;
+      paramsCollection = [];
+      paramsLocation = [];
+      paramLocationCounter = 0;
+    }
+  };
+
+  // remove api folder path
+  pathname = pathname.replace(apiFolderPath, "");
+
+  let currentNode = routable;
+
+  let router = {
+    current: currentNode[CURRENT_ROUTER_KEY],
+  };
+
+  const urlParts = pathname
+    // remove api folder path
+    .replace(apiFolderPath, "")
+    // get url parts
+    .split("/")
+    // remove empty
+    .filter((str) => str !== "");
+
+  // must check it in advanced, or the base route will cause error
+  for (let urlPart of urlParts) {
+    if (RESERVED_ROUTE_NAME_MAP[urlPart]) {
+      throw new Error("reserved route name");
+    }
+  }
+
+  // meaning targt the base route
+  if (urlParts.length == 0) {
+    urlParts.push(BASE_ROUTE_KEY);
+  }
+
+  let wildcardNode = null;
+
+  for (let i = 0; i < urlParts.length; i++) {
+    const urlPart = urlParts[i];
+    // currentNode.routable does exist, meaning it is a sub-router instead of the node a router
+    if (currentNode.routable) {
+      router = {
+        current: currentNode,
+      };
+      currentNode = currentNode.routable;
+      // if ever encounter a router, then url params must be addressed first
+      processUrlParams();
+    }
+
+    const next = currentNode[urlPart] ?? currentNode[QUERY_PARAM_KEY];
+
+    // check if there is wild in current node, if yes, record the first occurance
+    if (currentNode[WILDCARD_KEY] && !wildcardNode) {
+      wildcardNode = currentNode[WILDCARD_KEY];
+      processUrlParams({ isWildcard: true });
+    }
+
+    if (next) {
+      // map url part to params if the node is a url param
+      if (typeof next.paramsKey !== "undefined") {
+        paramsCollection.push([next.paramsKey, parseParam(urlPart)]);
+        paramsLocation.push(i);
+      }
+      currentNode = next;
+      paramLocationCounter++;
+      continue;
+    }
+
+    currentNode = next;
+    break;
+  }
+
+  if (
+    typeof currentNode === "undefined" ||
+    typeof currentNode[METHODS_KEY] === "undefined"
+  ) {
+    // if there is no route found but there is wildcard occurance, set currentNode to the wildcard node
+    if (wildcardNode) {
+      currentNode = wildcardNode;
+    } else {
+      return { err: new NotFoundError(), router: router.current };
+    }
+  }
+
+  if (typeof currentNode[METHODS_KEY][method] === "undefined") {
+    return { err: new MethodNotAllowedError(), router: router.current };
+  }
+
+  currentNode = currentNode[METHODS_KEY][method];
+
+  // mapping params
+  processUrlParams();
+  return { ...currentNode, params, router: router.current };
+};
+
+/**
+ * @param {Error} err
+ * @param {RouterInstance} router
+ * @param {import('.').NextApiRouterRequest} req
+ * @param {NextApiRouterResponse} res
+ */
+const processRouterError = async (err, router, req, res) => {
+  // first collect all the "set" error handler from current to the outter most parent
+
+  /**
+   * @param {RouterInstance} currentNode
+   * @param {Array<Promise<()=>{}>>} errorHandlers
+   * @returns {Array<Promise<()=>{}>>}
+   */
+  const collectErrorHandler = (currentNode, errorHandlers = []) => {
+    if (!currentNode) {
+      return errorHandlers;
+    }
+
+    if (
+      currentNode._errorHandlerIsSet ||
+      // if PARENT_ROUTER_KEY not exist in routable, meaning it is outter most parent router and it's errorhandler is enforced
+      !currentNode.routable[PARENT_ROUTER_KEY]
+    ) {
+      errorHandlers.push(currentNode._errorCallback);
+    }
+
+    return collectErrorHandler(
+      currentNode.routable[PARENT_ROUTER_KEY],
+      errorHandlers
+    );
+  };
+
+  const errorHandlers = collectErrorHandler(router);
+
+  for (let handler of errorHandlers) {
+    const { state, next, nextPromise } = makeNext(res);
+
+    await Promise.all([handler(err, req, res, next), nextPromise]);
+
+    // override error if error is passed to next()
+    if (state.nextReceivedError instanceof Error) {
+      err = state.nextReceivedError;
+    }
+    // if received resposne in any of the errorhandler, then just return
+    if (res._response) {
+      return res._response;
+    }
+  }
+};
+
+/**
+ *
+ * @param {()=>void} cb
+ * @param {import(".").NextApiRouterRequest} request
+ * @param {import(".").NextApiRouterResponse} response
+ * @param {URL} url
+ * @returns
+ */
+const handleCb = async (cb, request, response, url) => {
+  if (typeof cb !== "function") {
+    return new Error(
+      `a callback to route ${url.pathname} is not a function, received: ` + cb
+    );
+  }
+
+  const { state, next, nextPromise } = makeNext(response);
+
+  await Promise.all([cb(request, response, next), nextPromise]);
+
+  return [state.shouldNext, state.nextReceivedError];
+};
+
 const NextApiRouter = (
   // configure default options here directly
   {
@@ -200,270 +492,7 @@ const NextApiRouter = (
     [CURRENT_ROUTER_KEY]: null,
     [PARENT_ROUTER_KEY]: null,
     [CHILD_ROUTERS_KEY]: [],
-    [TIMEOUT_VALUE_KEY]: timeout || 20 * 1000,
-  };
-
-  /**
-   * @param {string | RouterInstance} method
-   * @param {string} route
-   * @param {Array<()=>{}>)} callbacks
-   */
-  function mapRouteToRoutable(method, route, callbacks) {
-    const parts = route
-      .split("/")
-      .map((str) => str.replace(/ /g, ""))
-      .filter((str) => str !== "");
-
-    let node = routable;
-
-    // get unique url params register
-    const urlParamsRegister = getUniqueUrlParamsRegister(parts);
-
-    // meaning this an empty route, then push a base route identifier
-    if (parts.length == 0) {
-      parts.push(BASE_ROUTE_KEY);
-    }
-
-    for (const part of parts) {
-      // url param, case
-      if (part.startsWith(":")) {
-        if (!node[QUERY_PARAM_KEY])
-          node[QUERY_PARAM_KEY] = {
-            paramsKey: {
-              [urlParamsRegister]: part.replace(":", ""),
-            },
-          };
-        else
-          node[QUERY_PARAM_KEY].paramsKey[urlParamsRegister] = part.replace(
-            ":",
-            ""
-          );
-
-        node = node[QUERY_PARAM_KEY];
-        continue;
-      }
-
-      if (!node[part]) {
-        node[part] = {};
-      }
-
-      node = node[part];
-    }
-
-    if (!node[METHODS_KEY]) {
-      node[METHODS_KEY] = {};
-    }
-
-    // if method is router instance, map subrouter
-    if (typeof method === "object" && method.routable) {
-      return node;
-    }
-
-    // map method
-    node[METHODS_KEY][method] = {
-      callbacks,
-      preMiddlewares: [...this._middlewareCollections],
-      postMiddlewares: [],
-    };
-
-    return node[METHODS_KEY][method];
-  }
-
-  const generateRouteMethod = (methods = []) => {
-    /**
-     * @param {string} route
-     * @param {...NextApiProcessCallback[]} callbacks
-     */
-    return function (route, ...callbacks) {
-      for (const method of methods) {
-        this.routes.push(route);
-        // map route and callback
-        const node = mapRouteToRoutable.call(this, method, route, callbacks);
-        this._nodeCollections.push(node);
-      }
-      return this;
-    };
-  };
-
-  /**
-   * @param {string} method HTTP method
-   * @param {string} pathname url pathname from new URL()
-   * @param {string} apiFolderPath the path of api folder
-   * @returns {{
-   *  params?:{
-   *     [key:string]:string
-   *  };
-   *  callbacks:Array<Promise<()=>{}>>;
-   *  preMiddlewares:Array<Promise<()=>{}>>;
-   *  postMiddlewares:Array<Promise<()=>{}>>;
-   *  router: RouterInstance
-   * } | undefined}
-   */
-  const getRoutableNodeFromPathname = (method, pathname, apiFolderPath) => {
-    const params = {};
-    let paramsLocation = [];
-    let paramsCollection = [];
-    let paramLocationCounter = 0;
-    let offsetX = 0;
-    const processUrlParams = ({ isWildcard = false } = {}) => {
-      if (paramsCollection.length > 0) {
-        const yValue = isWildcard
-          ? paramLocationCounter + 1 // offsetY +1 if is processUrlParams is due to encounter of a wildcard.
-          : paramLocationCounter;
-        const urlParamsRegister = getParamsRegisterCode(
-          paramsLocation.map((num) => num - offsetX),
-          yValue
-        );
-
-        paramsCollection.forEach((item) => {
-          const [paramsKeyObj, value] = item;
-          params[paramsKeyObj[urlParamsRegister]] = value;
-        });
-        offsetX += paramLocationCounter;
-        paramsCollection = [];
-        paramsLocation = [];
-        paramLocationCounter = 0;
-      }
-    };
-
-    // remove api folder path
-    pathname = pathname.replace(apiFolderPath, "");
-
-    let currentNode = routable;
-
-    let router = {
-      current: currentNode[CURRENT_ROUTER_KEY],
-    };
-
-    const urlParts = pathname
-      // remove api folder path
-      .replace(apiFolderPath, "")
-      // get url parts
-      .split("/")
-      // remove empty
-      .filter((str) => str !== "");
-
-    // must check it in advanced, or the base route will cause error
-    for (let urlPart of urlParts) {
-      if (RESERVED_ROUTE_NAME_MAP[urlPart]) {
-        throw new Error("reserved route name");
-      }
-    }
-
-    // meaning targt the base route
-    if (urlParts.length == 0) {
-      urlParts.push(BASE_ROUTE_KEY);
-    }
-
-    let wildcardNode = null;
-
-    for (let i = 0; i < urlParts.length; i++) {
-      const urlPart = urlParts[i];
-      // currentNode.routable does exist, meaning it is a sub-router instead of the node a router
-      if (currentNode.routable) {
-        router = {
-          current: currentNode,
-        };
-        currentNode = currentNode.routable;
-        // if ever encounter a router, then url params must be addressed first
-        processUrlParams();
-      }
-
-      const next = currentNode[urlPart] ?? currentNode[QUERY_PARAM_KEY];
-
-      // check if there is wild in current node, if yes, record the first occurance
-      if (currentNode[WILDCARD_KEY] && !wildcardNode) {
-        wildcardNode = currentNode[WILDCARD_KEY];
-        processUrlParams({ isWildcard: true });
-      }
-
-      if (next) {
-        // map url part to params if the node is a url param
-        if (typeof next.paramsKey !== "undefined") {
-          paramsCollection.push([next.paramsKey, parseParam(urlPart)]);
-          paramsLocation.push(i);
-        }
-        currentNode = next;
-        paramLocationCounter++;
-        continue;
-      }
-
-      currentNode = next;
-      break;
-    }
-
-    if (
-      typeof currentNode === "undefined" ||
-      typeof currentNode[METHODS_KEY] === "undefined"
-    ) {
-      // if there is no route found but there is wildcard occurance, set currentNode to the wildcard node
-      if (wildcardNode) {
-        currentNode = wildcardNode;
-      } else {
-        return { err: new NotFoundError(), router: router.current };
-      }
-    }
-
-    if (typeof currentNode[METHODS_KEY][method] === "undefined") {
-      return { err: new MethodNotAllowedError(), router: router.current };
-    }
-
-    currentNode = currentNode[METHODS_KEY][method];
-
-    // mapping params
-    processUrlParams();
-    return { ...currentNode, params, router: router.current };
-  };
-
-  /**
-   * @param {Error} err
-   * @param {RouterInstance} router
-   * @param {import('.').NextApiRouterRequest} req
-   * @param {NextApiRouterResponse} res
-   */
-  const processRouterError = async (err, router, req, res) => {
-    // first collect all the "set" error handler from current to the outter most parent
-
-    /**
-     * @param {RouterInstance} currentNode
-     * @param {Array<Promise<()=>{}>>} errorHandlers
-     * @returns {Array<Promise<()=>{}>>}
-     */
-    const collectErrorHandler = (currentNode, errorHandlers = []) => {
-      if (!currentNode) {
-        return errorHandlers;
-      }
-
-      if (
-        currentNode._errorHandlerIsSet ||
-        // if PARENT_ROUTER_KEY not exist in routable, meaning it is outter most parent router and it's errorhandler is enforced
-        !currentNode.routable[PARENT_ROUTER_KEY]
-      ) {
-        errorHandlers.push(currentNode._errorCallback);
-      }
-
-      return collectErrorHandler(
-        currentNode.routable[PARENT_ROUTER_KEY],
-        errorHandlers
-      );
-    };
-
-    const errorHandlers = collectErrorHandler(router);
-
-    for (let handler of errorHandlers) {
-      const { state, next, nextPromise } = makeNext(res);
-
-      await Promise.all([handler(err, req, res, next), nextPromise]);
-
-      // override error if error is passed to next()
-      if (state.nextReceivedError instanceof Error) {
-        err = state.nextReceivedError;
-      }
-      // if received resposne in any of the errorhandler, then just return
-      if (res._response) {
-        return res._response;
-      }
-    }
+    [TIMEOUT_VALUE_KEY]: timeout ?? 20 * 1000,
   };
 
   const currentRouter = {
@@ -741,10 +770,11 @@ const NextApiRouter = (
           params = {},
           router,
         } = getRoutableNodeFromPathname(
+          this.routable,
           method,
           reqUrlObj.pathname,
           this.apiFolderPath
-        ) ?? {};
+        );
 
         if (err instanceof Error) {
           await processRouterError(err, router, request, response);
@@ -761,61 +791,41 @@ const NextApiRouter = (
         }
 
         // if route does not match, then just run through all middlewares
+        /**@type {Array<()=>any>} */
         const allCallbacks =
           callbacks.length > 0
             ? [...preMiddlewares, ...callbacks, ...postMiddlewares]
             : [...router._middlewareCollections];
 
-        let timeoutResolve = null;
-        const timeoutPromise = new Promise((resolve) => {
-          timeoutResolve = resolve;
-        }).then(() => new TimeoutError("request timeout"));
-        /** handle time out  */
-        const handleTimeout = async () => {
-          timeoutResolve();
-        };
-
-        const routerTimeoutValue = router.routable[TIMEOUT_VALUE_KEY];
-
-        const instanceTimeout =
-          typeof routerTimeoutValue === "number"
-            ? setTimeout(handleTimeout, routerTimeoutValue)
-            : typeof routerTimeoutValue === "function"
-            ? setTimeout(handleTimeout, routerTimeoutValue(request))
-            : undefined;
+        const { timeoutPromise, timeoutInstance } = makeTimeoutInstance(
+          router.routable[TIMEOUT_VALUE_KEY],
+          request
+        );
 
         const cleanUp = () => {
-          clearTimeout(instanceTimeout);
+          clearTimeout(timeoutInstance);
         };
         /** ************************************ */
-
-        /** middleware and route call back exec */
-        const handleCb = async () => {
-          const cb = allCallbacks.shift();
-
-          if (typeof cb !== "function") {
-            return new Error(
-              `a callback to route ${reqUrlObj.pathname} is not a function, received: ` +
-                cb
-            );
-          }
-
-          const { state, next, nextPromise } = makeNext(response);
-
-          await Promise.all([cb(request, response, next), nextPromise]);
-
-          return [state.shouldNext, state.nextReceivedError];
-        };
 
         const exec = () => {
           return new Promise(async (resolve, reject) => {
             let isResolved = false;
             while (allCallbacks.length) {
-              const result = await Promise.race([handleCb(), timeoutPromise])
-                // enure error is catch in each callback so that user does have
-                // to implement something like catchAsync like we have to do
-                // in express.js
-                .catch((err) => err);
+              const cb = allCallbacks.shift();
+              const result =
+                // if timeoutPromise=undefined, meaning user set timeout=false
+                typeof timeoutPromise === "undefined"
+                  ? await handleCb(cb, request, response, reqUrlObj).catch(
+                      (err) => err
+                    )
+                  : await Promise.race([
+                      handleCb(cb, request, response, reqUrlObj),
+                      timeoutPromise,
+                    ])
+                      // enure error is catch in each callback so that user does have
+                      // to implement something like catchAsync like we have to do
+                      // in express.js
+                      .catch((err) => err);
 
               if (result instanceof Error) {
                 // pass the error back and let error handled after it's resolved

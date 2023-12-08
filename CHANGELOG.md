@@ -1,5 +1,13 @@
 # @billyen2012/next-api-router
 
+## 1.7.2
+
+### Patch Changes
+
+- allow option timeout=false , which will completely disabled to built-in timeout mechanism
+- optimize test
+- code refactor
+
 ## 1.7.1
 
 ### Patch Changes

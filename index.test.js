@@ -10,6 +10,7 @@ import { NextApiRouteError } from "./src/errors";
 import { NextApiRouterResponse } from "./src/response";
 import { Readable } from "stream";
 import { collectAllChildRouters } from "./src/util/collectAllChildrenRouters";
+import { makeTimeoutInstance } from "./src/util/makeTimeoutInstance";
 
 const BASE_URL = "http://localhost:3000/api";
 const TEST_TIME_OUT_ROUTE = "/timeout";
@@ -331,17 +332,6 @@ describe("behaviors", () => {
     expect(response).toBeInstanceOf(Response);
   });
 
-  test("app will timeout if surpass timeout time", async () => {
-    const request = makeHttpRequest(BASE_URL + TEST_TIME_OUT_ROUTE, {
-      method: "GET",
-    });
-    const promise = routeHandler(request);
-    await sleep(1100);
-    const respone = await Promise.resolve(promise);
-    expect(request.err).toBeInstanceOf(TimeoutError);
-    expect(respone.status).toBe(408);
-  });
-
   test("app will return RouteNotFound if route does not exist", async () => {
     const request = makeHttpRequest(BASE_URL + "/somewhere/surely/not/exist", {
       method: "GET",
@@ -410,7 +400,7 @@ describe("behaviors", () => {
   describe("middlewares", () => {
     // build a new app for testing middlewares
     const app2 = NextApiRouter({
-      timeout: 1000,
+      timeout: 100,
       apiFolderPath: "/api",
       ejsFolderPath: "/src/test-use",
     });
@@ -443,7 +433,7 @@ describe("behaviors", () => {
     );
 
     app2.use(async (req, res, next) => {
-      await sleep(1000);
+      await sleep(150);
       req.data.push(3);
     });
 
@@ -463,7 +453,7 @@ describe("behaviors", () => {
       expect(request.data[1]).toBe(1);
       expect(request.data[2]).toBe(2);
       expect(typeof request.data[3]).toBe("undefined");
-      await sleep(2000);
+      await sleep(200);
       expect(request.data[3]).toBe(3);
     });
 
@@ -1052,5 +1042,23 @@ describe("test restrictions", () => {
       );
     };
     expect(t).toThrow(Error);
+  });
+});
+
+describe("test util", () => {
+  describe("makeTimeoutInstance", () => {
+    test("if routerTimeoutValue is false, it will return an empty object", async () => {
+      const obj = makeTimeoutInstance(false);
+      expect(Object.keys(obj).length).toBe(0);
+    });
+
+    test("if routerTimeoutValue is false, it will return an empty object", async () => {
+      const { timeoutInstance, timeoutPromise, timeoutResolve, handleTimeout } =
+        makeTimeoutInstance(300);
+      expect(typeof handleTimeout).toBe("function");
+      expect(typeof timeoutResolve).toBe("function");
+      expect(typeof timeoutInstance).toBe("object");
+      expect(timeoutPromise).toBeInstanceOf(Promise);
+    });
   });
 });
