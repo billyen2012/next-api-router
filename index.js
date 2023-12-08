@@ -15,15 +15,16 @@ import Static from "./src/static";
 import { collectAllChildRouters } from "./src/util/collectAllChildrenRouters";
 import {
   BASE_ROUTE_KEY,
-  CURRENT_ROUTER,
-  CHILD_ROUTERS,
+  CURRENT_ROUTER_KEY,
+  CHILD_ROUTERS_KEY,
   METHODS_KEY,
-  PARENT_ROUTER,
+  PARENT_ROUTER_KEY,
   QUERY_PARAM_KEY,
   ROUTER_ID_KEY,
   SUPPORTED_HTTP_METHODS,
   TIMEOUT_VALUE_KEY,
   WILDCARD_KEY,
+  RESERVED_ROUTE_NAME_MAP,
 } from "./src/instance-constant";
 
 /**
@@ -107,7 +108,7 @@ const collectMiddlewaresFromParentRouter = (
   currentRouter,
   middlewares = []
 ) => {
-  const parent = currentRouter.routable[PARENT_ROUTER];
+  const parent = currentRouter.routable[PARENT_ROUTER_KEY];
 
   if (parent) {
     middlewares.unshift(...parent._middlewareCollections);
@@ -196,9 +197,9 @@ const NextApiRouter = (
 ) => {
   const routable = {
     [ROUTER_ID_KEY]: randomId(),
-    [CURRENT_ROUTER]: null,
-    [PARENT_ROUTER]: null,
-    [CHILD_ROUTERS]: [],
+    [CURRENT_ROUTER_KEY]: null,
+    [PARENT_ROUTER_KEY]: null,
+    [CHILD_ROUTERS_KEY]: [],
     [TIMEOUT_VALUE_KEY]: timeout || 20 * 1000,
   };
 
@@ -331,7 +332,7 @@ const NextApiRouter = (
     let currentNode = routable;
 
     let router = {
-      current: currentNode[CURRENT_ROUTER],
+      current: currentNode[CURRENT_ROUTER_KEY],
     };
 
     const urlParts = pathname
@@ -341,6 +342,13 @@ const NextApiRouter = (
       .split("/")
       // remove empty
       .filter((str) => str !== "");
+
+    // must check it in advanced, or the base route will cause error
+    for (let urlPart of urlParts) {
+      if (RESERVED_ROUTE_NAME_MAP[urlPart]) {
+        throw new Error("reserved route name");
+      }
+    }
 
     // meaning targt the base route
     if (urlParts.length == 0) {
@@ -368,12 +376,6 @@ const NextApiRouter = (
         wildcardNode = currentNode[WILDCARD_KEY];
         processUrlParams({ isWildcard: true });
       }
-
-      // if (typeof next !== "undefined" && next[CURRENT_ROUTER]) {
-      //   router = {
-      //     current: next[CURRENT_ROUTER],
-      //   };
-      // }
 
       if (next) {
         // map url part to params if the node is a url param
@@ -434,14 +436,14 @@ const NextApiRouter = (
 
       if (
         currentNode._errorHandlerIsSet ||
-        // if PARENT_ROUTER not exist in routable, meaning it is outter most parent router and it's errorhandler is enforced
-        !currentNode.routable[PARENT_ROUTER]
+        // if PARENT_ROUTER_KEY not exist in routable, meaning it is outter most parent router and it's errorhandler is enforced
+        !currentNode.routable[PARENT_ROUTER_KEY]
       ) {
         errorHandlers.push(currentNode._errorCallback);
       }
 
       return collectErrorHandler(
-        currentNode.routable[PARENT_ROUTER],
+        currentNode.routable[PARENT_ROUTER_KEY],
         errorHandlers
       );
     };
@@ -607,16 +609,25 @@ const NextApiRouter = (
           return this._mapStatic(cbs[0], subRouter, middlewares);
         }
 
+        // throw error if pass in the wrong arguement
+        if (typeof subRouter !== "object" && !subRouter.routable) {
+          const err = new Error(
+            "In 'use()', if first arg is a route string, then the last arg must either be a router from 'NextApiRouter()' or static from 'app.static()'"
+          );
+          err.name = "InvalidArgument";
+          throw err;
+        }
+
         const node = mapRouteToRoutable.call(this, subRouter, cbs[0]);
 
-        // add current router object into PARENT_ROUTER collection if not exist
-        if (!subRouter.routable[PARENT_ROUTER]) {
-          subRouter.routable[PARENT_ROUTER] = this;
+        // add current router object into PARENT_ROUTER_KEY collection if not exist
+        if (!subRouter.routable[PARENT_ROUTER_KEY]) {
+          subRouter.routable[PARENT_ROUTER_KEY] = this;
         }
 
         // and add current router as it's child if not exist
-        if (!this.routable[CHILD_ROUTERS].includes(subRouter)) {
-          this.routable[CHILD_ROUTERS].push(subRouter);
+        if (!this.routable[CHILD_ROUTERS_KEY].includes(subRouter)) {
+          this.routable[CHILD_ROUTERS_KEY].push(subRouter);
         }
 
         // traverse to all the parent router and add all its collected middlewares as pre-middlewares
@@ -882,7 +893,7 @@ const NextApiRouter = (
     },
   };
 
-  routable[CURRENT_ROUTER] = currentRouter;
+  routable[CURRENT_ROUTER_KEY] = currentRouter;
   return currentRouter;
 };
 

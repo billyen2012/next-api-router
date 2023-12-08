@@ -79,7 +79,7 @@ app/
     └── route.js
 ```
 
-And then have you `const export app = NextApiRouter()` created in some other folder or file and then import them to both `route.js`
+And then have your `const export app = NextApiRouter()` created in some other folder or file and then import them to both `route.js`
 
 <hr/>
 

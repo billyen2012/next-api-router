@@ -1036,3 +1036,21 @@ describe("test static()", () => {
     expect(response.headers.get("test")).toBe("test2");
   });
 });
+
+describe("test restrictions", () => {
+  test("callback as last arg of use() will throw", async () => {
+    const t = () => {
+      const app = NextApiRouter();
+      app.use(
+        "/static",
+        (req, res, next) => {
+          next();
+        },
+        (req, res) => {
+          res.send("OK");
+        }
+      );
+    };
+    expect(t).toThrow(Error);
+  });
+});

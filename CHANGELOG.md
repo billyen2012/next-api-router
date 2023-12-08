@@ -1,5 +1,12 @@
 # @billyen2012/next-api-router
 
+## 1.7.1
+
+### Patch Changes
+
+- miscellaneous fixes
+- refactor
+
 ## 1.7.0
 
 ### Minor Changes

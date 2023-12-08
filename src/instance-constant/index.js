@@ -3,9 +3,9 @@ import { randomId } from "../util/randomId";
 const INSTANCE_ID = randomId();
 const QUERY_PARAM_KEY = `qp_${INSTANCE_ID}`;
 const BASE_ROUTE_KEY = `base_${INSTANCE_ID}`;
-const PARENT_ROUTER = `parent_router_${INSTANCE_ID}`;
-const CURRENT_ROUTER = `current_router_${INSTANCE_ID}`;
-const CHILD_ROUTERS = `child_routers_${INSTANCE_ID}`;
+const PARENT_ROUTER_KEY = `parent_router_${INSTANCE_ID}`;
+const CURRENT_ROUTER_KEY = `current_router_${INSTANCE_ID}`;
+const CHILD_ROUTERS_KEY = `child_routers_${INSTANCE_ID}`;
 const METHODS_KEY = `methods_${INSTANCE_ID}`;
 const ROUTER_ID_KEY = `router_id_${INSTANCE_ID}`;
 const TIMEOUT_VALUE_KEY = `timeout_${INSTANCE_ID}`;
@@ -20,16 +20,31 @@ const SUPPORTED_HTTP_METHODS = [
   "HEAD",
 ];
 
+const RESERVED_ROUTE_NAME_MAP = {};
+for (let key of [
+  QUERY_PARAM_KEY,
+  BASE_ROUTE_KEY,
+  PARENT_ROUTER_KEY,
+  CURRENT_ROUTER_KEY,
+  CHILD_ROUTERS_KEY,
+  METHODS_KEY,
+  ROUTER_ID_KEY,
+  TIMEOUT_VALUE_KEY,
+]) {
+  RESERVED_ROUTE_NAME_MAP[key] = true;
+}
+
 export {
   INSTANCE_ID,
   QUERY_PARAM_KEY,
   BASE_ROUTE_KEY,
-  PARENT_ROUTER,
-  CURRENT_ROUTER,
-  CHILD_ROUTERS,
+  PARENT_ROUTER_KEY,
+  CURRENT_ROUTER_KEY,
+  CHILD_ROUTERS_KEY,
   METHODS_KEY,
   ROUTER_ID_KEY,
   TIMEOUT_VALUE_KEY,
   WILDCARD_KEY,
   SUPPORTED_HTTP_METHODS,
+  RESERVED_ROUTE_NAME_MAP,
 };
