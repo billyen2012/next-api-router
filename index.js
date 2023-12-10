@@ -258,7 +258,11 @@ function mapRouteToRoutable(method, route, callbacks) {
         if (!node[WILDCARD_PREFIX_KEY]) {
           node[WILDCARD_PREFIX_KEY] = [];
         }
-        node[WILDCARD_PREFIX_KEY].push(wildcardPrefix);
+        // if wildcardPrefix not included, add it to the list
+        if (!node[WILDCARD_PREFIX_KEY].includes(wildcardPrefix)) {
+          node[WILDCARD_PREFIX_KEY].push(wildcardPrefix);
+        }
+
         // sort from longest to shortest
         node[WILDCARD_PREFIX_KEY].sort((a, b) => b.length - a.length);
       }

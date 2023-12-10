@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.9.2
+
+### Patch Changes
+
+- miscellaneous fixes
+
 ## 1.9.1
 
 ### Patch Changes
