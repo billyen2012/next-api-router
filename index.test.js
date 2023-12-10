@@ -889,7 +889,7 @@ describe("test complex middlewares with sub-routers and wildcard", () => {
     expect(response.status).toBe(200);
   });
 
-  test("wildcard can be prefix", async () => {
+  test("wildcard can ues a prefix", async () => {
     app1.get("/prefix/abc*", (req, res) => {
       res.send();
     });
@@ -904,6 +904,13 @@ describe("test complex middlewares with sub-routers and wildcard", () => {
     });
     const response2 = await app1.handler()(request2);
     expect(response2.status).toBe(404);
+
+    const request3 = makeHttpRequest(BASE_URL + "/prefix/abcdef/random/route", {
+      method: "GET",
+    });
+
+    const response3 = await app1.handler()(request3);
+    expect(response3.status).toBe(200);
   });
 
   describe("url param can be processed in `use()` correctly, and a wildcard should not have conflict to the url param", () => {

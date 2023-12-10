@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.9.1
+
+### Patch Changes
+
+- fix prefixed wildcard route behavior
+
 ## 1.9.0
 
 ### Minor Changes

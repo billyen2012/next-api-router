@@ -24,6 +24,8 @@ import {
   ROUTER_ID_KEY,
   SUPPORTED_HTTP_METHODS,
   WILDCARD_KEY,
+  PROTECT_PREFIX,
+  WILDCARD_PREFIX_KEY,
 } from "./src/instance-constant";
 import { makeTimeoutInstance } from "./src/util/makeTimeoutInstance";
 
@@ -69,6 +71,25 @@ const getAllFilesInDirectory = (directoryPath) => {
   }
 
   return filesArray;
+};
+
+/**
+ * prefixes are already sorted from longest to shortest
+ * @param {undefined | string[]} prefixes
+ * @param {string} urlPart
+ */
+const getWildcardPrefix = (prefixes, urlPart) => {
+  if (!prefixes) {
+    return "";
+  }
+
+  for (let prefix of prefixes) {
+    if (urlPart.startsWith(prefix)) {
+      return prefix;
+    }
+  }
+
+  return "";
 };
 
 const makeNext = (response) => {
@@ -230,6 +251,18 @@ function mapRouteToRoutable(method, route, callbacks) {
     // wildcard case
     if (part.endsWith("*")) {
       const wildcard = part.replace(/\*/g, "") + WILDCARD_KEY;
+      const wildcardParts = wildcard.split(PROTECT_PREFIX);
+
+      if (wildcardParts.length > 1) {
+        const wildcardPrefix = wildcardParts[0];
+        if (!node[WILDCARD_PREFIX_KEY]) {
+          node[WILDCARD_PREFIX_KEY] = [];
+        }
+        node[WILDCARD_PREFIX_KEY].push(wildcardPrefix);
+        // sort from longest to shortest
+        node[WILDCARD_PREFIX_KEY].sort((a, b) => b.length - a.length);
+      }
+
       if (!node[wildcard]) {
         node[wildcard] = {};
       }
@@ -363,10 +396,11 @@ const getRoutableNodeFromPathname = (
       processUrlParams();
     }
 
-    const next = currentNode[urlPart] ?? currentNode[QUERY_PARAM_KEY];
-
     // check if there is wild in current node, if yes, record the first occurance
-    const prefixedWildcard = urlPart + WILDCARD_KEY;
+    const prefixedWildcard =
+      getWildcardPrefix(currentNode[WILDCARD_PREFIX_KEY], urlPart) +
+      WILDCARD_KEY;
+    // get prefix
     if (
       (currentNode[WILDCARD_KEY] || currentNode[prefixedWildcard]) &&
       !wildcardNode
@@ -374,6 +408,8 @@ const getRoutableNodeFromPathname = (
       wildcardNode = currentNode[prefixedWildcard] ?? currentNode[WILDCARD_KEY];
       processUrlParams({ isWildcard: true });
     }
+
+    const next = currentNode[urlPart] ?? currentNode[QUERY_PARAM_KEY];
 
     if (next) {
       // map url part to params if the node is a url param
