@@ -23,9 +23,7 @@ import {
   QUERY_PARAM_KEY,
   ROUTER_ID_KEY,
   SUPPORTED_HTTP_METHODS,
-  TIMEOUT_VALUE_KEY,
   WILDCARD_KEY,
-  RESERVED_ROUTE_NAME_MAP,
 } from "./src/instance-constant";
 import { makeTimeoutInstance } from "./src/util/makeTimeoutInstance";
 
@@ -229,6 +227,16 @@ function mapRouteToRoutable(method, route, callbacks) {
       continue;
     }
 
+    // wildcard case
+    if (part.endsWith("*")) {
+      const wildcard = part.replace(/\*/g, "") + WILDCARD_KEY;
+      if (!node[wildcard]) {
+        node[wildcard] = {};
+      }
+      node = node[wildcard];
+      continue;
+    }
+
     if (!node[part]) {
       node[part] = {};
     }
@@ -292,6 +300,7 @@ const getRoutableNodeFromPathname = (
   pathname,
   apiFolderPath
 ) => {
+  // helper function for processing the url params properly
   const params = {};
   let paramsLocation = [];
   let paramsCollection = [];
@@ -335,13 +344,6 @@ const getRoutableNodeFromPathname = (
     // remove empty
     .filter((str) => str !== "");
 
-  // must check it in advanced, or the base route will cause error
-  for (let urlPart of urlParts) {
-    if (RESERVED_ROUTE_NAME_MAP[urlPart]) {
-      throw new Error("reserved route name");
-    }
-  }
-
   // meaning targt the base route
   if (urlParts.length == 0) {
     urlParts.push(BASE_ROUTE_KEY);
@@ -364,8 +366,12 @@ const getRoutableNodeFromPathname = (
     const next = currentNode[urlPart] ?? currentNode[QUERY_PARAM_KEY];
 
     // check if there is wild in current node, if yes, record the first occurance
-    if (currentNode[WILDCARD_KEY] && !wildcardNode) {
-      wildcardNode = currentNode[WILDCARD_KEY];
+    const prefixedWildcard = urlPart + WILDCARD_KEY;
+    if (
+      (currentNode[WILDCARD_KEY] || currentNode[prefixedWildcard]) &&
+      !wildcardNode
+    ) {
+      wildcardNode = currentNode[prefixedWildcard] ?? currentNode[WILDCARD_KEY];
       processUrlParams({ isWildcard: true });
     }
 
@@ -384,6 +390,7 @@ const getRoutableNodeFromPathname = (
     break;
   }
 
+  // no route found case
   if (
     typeof currentNode === "undefined" ||
     typeof currentNode[METHODS_KEY] === "undefined"
@@ -395,6 +402,8 @@ const getRoutableNodeFromPathname = (
       return { err: new NotFoundError(), router: router.current };
     }
   }
+
+  // has route mapping but not the requested method
 
   if (typeof currentNode[METHODS_KEY][method] === "undefined") {
     return { err: new MethodNotAllowedError(), router: router.current };
@@ -523,7 +532,7 @@ const handleCb = async (
 const NextApiRouter = (
   // configure default options here directly
   {
-    timeout, // 20s
+    timeout = 20 * 1000, // 20s
     apiFolderPath = "/api",
     ejsFolderPath = "",
     treatReturnAsResponse = false,
@@ -534,13 +543,13 @@ const NextApiRouter = (
     [CURRENT_ROUTER_KEY]: null,
     [PARENT_ROUTER_KEY]: null,
     [CHILD_ROUTERS_KEY]: [],
-    [TIMEOUT_VALUE_KEY]: timeout ?? 20 * 1000,
   };
 
   const currentRouter = {
     get routable() {
       return routable;
     },
+    _timeout: timeout,
     _nodeCollections: [],
     _middlewareCollections: [],
     _errorCallback: async (err, req, res) => {
@@ -845,7 +854,7 @@ const NextApiRouter = (
             : [...router._middlewareCollections];
 
         const { timeoutPromise, timeoutInstance } = makeTimeoutInstance(
-          router.routable[TIMEOUT_VALUE_KEY],
+          router.routable[CURRENT_ROUTER_KEY]._timeout,
           request
         );
 

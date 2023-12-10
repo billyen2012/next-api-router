@@ -889,6 +889,23 @@ describe("test complex middlewares with sub-routers and wildcard", () => {
     expect(response.status).toBe(200);
   });
 
+  test("wildcard can be prefix", async () => {
+    app1.get("/prefix/abc*", (req, res) => {
+      res.send();
+    });
+    const request1 = makeHttpRequest(BASE_URL + "/prefix/abc/random/route", {
+      method: "GET",
+    });
+    const response1 = await app1.handler()(request1);
+    expect(response1.status).toBe(200);
+
+    const request2 = makeHttpRequest(BASE_URL + "/prefix/other/random/route", {
+      method: "GET",
+    });
+    const response2 = await app1.handler()(request2);
+    expect(response2.status).toBe(404);
+  });
+
   describe("url param can be processed in `use()` correctly, and a wildcard should not have conflict to the url param", () => {
     app1.use("/:a/b/:c", app2);
     app2.use("/:d/e", app3);
@@ -1059,6 +1076,18 @@ describe("test util", () => {
       expect(typeof timeoutResolve).toBe("function");
       expect(typeof timeoutInstance).toBe("object");
       expect(timeoutPromise).toBeInstanceOf(Promise);
+    });
+
+    test("if timeout is a function, it will call the function pass reqeust to the callback", async () => {
+      const reqeust = {};
+      const timeout = (req) => {
+        req.a = "b";
+        return 300;
+      };
+
+      makeTimeoutInstance(timeout, reqeust);
+
+      expect(reqeust.a).toBe("b");
     });
   });
 });

@@ -1,5 +1,15 @@
 # @billyen2012/next-api-router
 
+## 1.9.0
+
+### Minor Changes
+
+- now wildcard can use a prefix (e.g. `/example*`)
+
+### Patch Changes
+
+- use protect-prefix to completely removed the possibility of request route collision with internally used route
+
 ## 1.8.0
 
 ### Minor Changes
