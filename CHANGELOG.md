@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.9.4
+
+### Patch Changes
+
+- remove utility function `getBaseUrl()`. Instead, code example will be provided
+
 ## 1.9.3
 
 ### Patch Changes

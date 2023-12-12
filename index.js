@@ -28,7 +28,6 @@ import {
   WILDCARD_PREFIX_KEY,
 } from "./src/instance-constant";
 import { makeTimeoutInstance } from "./src/util/makeTimeoutInstance";
-import { getBaseUrl } from "./src/util/getBaseUrl";
 
 /**
  * @callback NextApiProcessCallback
@@ -1027,5 +1026,4 @@ export {
   TimeoutError,
   MethodNotAllowedError,
   InvalidReturnDataTypeError,
-  getBaseUrl,
 };

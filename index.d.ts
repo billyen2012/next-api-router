@@ -243,7 +243,6 @@ export declare class MethodNotAllowedError extends NextApiRouteError {}
 export interface NextCallback {
   (error?: Error): void;
 }
-export declare function getBaseUrl(): string | null;
 
 export interface NextApiProcessCallback {
   (
