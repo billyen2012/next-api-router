@@ -1,5 +1,12 @@
 # @billyen2012/next-api-router
 
+## 1.9.3
+
+### Patch Changes
+
+- code refactor
+- add `getBaseUrl()` utility function
+
 ## 1.9.2
 
 ### Patch Changes

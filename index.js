@@ -28,6 +28,7 @@ import {
   WILDCARD_PREFIX_KEY,
 } from "./src/instance-constant";
 import { makeTimeoutInstance } from "./src/util/makeTimeoutInstance";
+import { getBaseUrl } from "./src/util/getBaseUrl";
 
 /**
  * @callback NextApiProcessCallback
@@ -838,6 +839,8 @@ const NextApiRouter = (
       return async (request) => {
         // bind internal use state
         request._startAt = process.hrtime();
+
+        // custom getter
         Object.defineProperty(request, "ip", {
           get: function () {
             return this.headers.get("x-forwarded-for") || undefined;
@@ -847,6 +850,7 @@ const NextApiRouter = (
         // bind custom methods
         request.getHeader = getHeader.bind(request);
         request.getHeaders = getHeaders.bind(request);
+
         const { url, method } = request;
         const reqUrlObj = new URL(url);
         const response = new NextApiRouterResponse({
@@ -855,7 +859,7 @@ const NextApiRouter = (
           req: request,
         });
 
-        response._requestNextUrl = request.nextUrl;
+        response._requestUrlObject = reqUrlObj;
 
         // match url parts to the routable and call middleware and route cb in sequences
         const {
@@ -1023,4 +1027,5 @@ export {
   TimeoutError,
   MethodNotAllowedError,
   InvalidReturnDataTypeError,
+  getBaseUrl,
 };

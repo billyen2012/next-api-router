@@ -207,7 +207,7 @@ describe("Basics of NextApiResponse class", () => {
 
   test("redirect() will set _redirectUrl and send", () => {
     const response = new NextApiRouterResponse();
-    response._requestNextUrl = new URL("http://localhost:3000/");
+    response._requestUrlObject = new URL("http://localhost:3000/");
     response.redirect("/some/where");
 
     expect(response._redirectUrl).toBe("/some/where");
@@ -1096,5 +1096,18 @@ describe("test util", () => {
 
       expect(reqeust.a).toBe("b");
     });
+  });
+});
+
+describe("test custom reqeust property", () => {
+  test("ip", async () => {
+    const request = makeHttpRequest(BASE_URL, {
+      method: "GET",
+      headers: {
+        "x-forwarded-for": "127.0.0.1",
+      },
+    });
+    await routeHandler(request);
+    expect(request.ip).toBe("127.0.0.1");
   });
 });

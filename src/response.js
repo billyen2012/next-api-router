@@ -143,7 +143,7 @@ export class NextApiRouterResponse extends Response {
   _sent = null;
   _response = null;
   /**@type {URL} */
-  _requestNextUrl = null;
+  _requestUrlObject = null;
   _statusText = null;
   get statusMessage() {
     return this._statusText || undefined;
@@ -349,7 +349,7 @@ export class NextApiRouterResponse extends Response {
         typeof this._redirectUrl === "string" &&
         this._redirectUrl.startsWith("/")
       ) {
-        const url = this._requestNextUrl;
+        const url = this._requestUrlObject;
         url.pathname = this._redirectUrl;
         this._response = Response.redirect(url, this.statusCode || 302);
         return;
@@ -362,13 +362,11 @@ export class NextApiRouterResponse extends Response {
       return;
     }
 
-    const headers = this.getHeaders();
-
     /**@type {ResponseInit} */
     const payloadOptions = {
       status: this._status || 200,
       statusText: this.statusMessage,
-      headers,
+      headers: this.headers,
     };
 
     if (!this._sent) {
