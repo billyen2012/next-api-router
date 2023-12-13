@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.10.0
+
+### Minor Changes
+
+- add `rewrite()` to response object
+
 ## 1.9.4
 
 ### Patch Changes

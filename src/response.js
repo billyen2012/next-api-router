@@ -5,7 +5,7 @@ import ejs from "ejs";
 import etag from "etag";
 import { fileMetaAsync } from "./util/fileMetaAsync";
 import { NotFoundError } from "./errors";
-
+import { request } from "undici";
 // only the common MIME TYPE
 const FILE_ENDING_TO_MIME_TYPE = {
   "7z": "application/x-7z-compressed",
@@ -262,6 +262,34 @@ export class NextApiRouterResponse extends Response {
     this._redirectUrl = url;
     // trigger send
     this.send();
+  }
+  /**
+   * @param {string | URL} url
+   * @param {import("../index").UndiciRequestOptions} options
+   */
+  async rewrite(url, options = {}) {
+    const _headers = this._req.getHeaders();
+    // dropping host header because it will cause https issue and
+    // x-forwarded-* should be sufficient enough for remote resource to understand where the request is coming from.
+    _headers["host"] = undefined;
+
+    if (typeof url === "string" && url.startsWith("/")) {
+      const _url = new URL(this._req.url);
+      _url.pathname = url;
+      url = _url;
+    }
+
+    /**
+     * because `fetch` will automatically unzip gzip body, `request` form `undici` is used
+     */
+    const { statusCode, headers, body } = await request(url, {
+      method: this._req.method,
+      headers: _headers,
+      body: this._req.body,
+      ...options,
+    });
+
+    this.status(statusCode).setHeaders(headers).pipe(body);
   }
   /**
    * @param {Readable} stream

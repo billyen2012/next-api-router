@@ -2,6 +2,8 @@ import { type Data as EjsData, type Options as EjsOptions } from "ejs";
 import { type ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { type Readable } from "stream";
 import type fs from "fs";
+import type { Dispatcher } from "undici";
+
 type HttpHeaders = [
   "accept",
   "accept-charset",
@@ -97,6 +99,12 @@ type HttpHeaders = [
   "x-webkit-csp",
   "x-xss-protection"
 ];
+
+export type UndiciRequestOptions = { dispatcher?: Dispatcher } & Omit<
+  Dispatcher.RequestOptions,
+  "origin" | "path" | "method"
+> &
+  Partial<Pick<Dispatcher.RequestOptions, "method">>;
 
 export type HttpHeadersObject = {
   accept?: string;
@@ -229,6 +237,7 @@ export declare class NextApiRouterResponse {
   getHeader(name: HttpHeaders[number]): string;
   getHeaders: typeof GetHeaders;
   removeHeader(name: string): this;
+  rewrite(url: string | url, options?: UndiciRequestOptions): Promise<void>;
 }
 export declare class NextApiRouteError extends Error {
   constructor(message: string);
