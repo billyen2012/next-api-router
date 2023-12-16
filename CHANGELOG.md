@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.10.2
+
+### Patch Changes
+
+- fixed nested route url params issue
+
 ## 1.10.1
 
 ### Patch Changes

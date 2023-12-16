@@ -1157,3 +1157,48 @@ describe("check base route access", () => {
     expect(request.params.bar).toBe("b");
   });
 });
+
+describe("test nested route url params", () => {
+  const app = NextApiRouter();
+
+  const app2 = NextApiRouter();
+
+  const app3 = NextApiRouter();
+
+  app.use("/:a", app2);
+
+  app2.get("/:b/:c", (req, res) => {
+    res.send({
+      params: req.params,
+    });
+  });
+
+  app2.use("/f/g", app3);
+
+  app3.get("/:h", (req, res) => {
+    res.send({
+      params: req.params,
+    });
+  });
+
+  test("query app2 should get proper url params", async () => {
+    const request = makeHttpRequest(BASE_URL + "/api/1/2/3", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    expect(response.status).toBe(200);
+    expect(request.params.a).toBe(1);
+    expect(request.params.b).toBe(2);
+    expect(request.params.c).toBe(3);
+  });
+
+  test("query app2 should get proper url params", async () => {
+    const request = makeHttpRequest(BASE_URL + "/api/1/f/g/5", {
+      method: "GET",
+    });
+    const response = await app.handler()(request);
+    expect(response.status).toBe(200);
+    expect(request.params.a).toBe(1);
+    expect(request.params.h).toBe(5);
+  });
+});

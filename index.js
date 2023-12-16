@@ -357,11 +357,11 @@ const getRoutableNodeFromPathname = (
         const [paramsKeyObj, value] = item;
         params[paramsKeyObj[urlParamsRegister]] = value;
       });
-      offsetX += paramLocationCounter;
       paramsCollection = [];
       paramsLocation = [];
-      paramLocationCounter = 0;
     }
+    offsetX += paramLocationCounter;
+    paramLocationCounter = 0;
   };
 
   // remove api folder path
