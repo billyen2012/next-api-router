@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.10.1
+
+### Patch Changes
+
+- fixed based route of the nested router issue.
+
 ## 1.10.0
 
 ### Minor Changes

@@ -1099,7 +1099,7 @@ describe("test util", () => {
   });
 });
 
-describe("test custom reqeust property", () => {
+describe("test custom request property", () => {
   test("ip", async () => {
     const request = makeHttpRequest(BASE_URL, {
       method: "GET",
@@ -1109,5 +1109,51 @@ describe("test custom reqeust property", () => {
     });
     await routeHandler(request);
     expect(request.ip).toBe("127.0.0.1");
+  });
+});
+
+describe("check base route access", () => {
+  const app1 = NextApiRouter();
+  const app2 = NextApiRouter();
+  const app3 = NextApiRouter();
+  app1.get("/", (req, res) => {
+    res.send("1");
+  });
+  app2.get("/", (req, res) => {
+    res.send("2");
+  });
+  app3.get("/", (req, res) => {
+    res.send(req.params);
+  });
+  app1.use("/app2", app2);
+
+  app1.use("/app3/:foo/:bar", app3);
+
+  test("app1 should have access to its base route", async () => {
+    const request = makeHttpRequest(BASE_URL + "/api/", {
+      method: "GET",
+    });
+    const response = await app1.handler()(request);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("1");
+  });
+
+  test("app2 should have access to its base route after nesting to the app1", async () => {
+    const request = makeHttpRequest(BASE_URL + "/api/app2", {
+      method: "GET",
+    });
+    const response = await app1.handler()(request);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("2");
+  });
+
+  test("app3 should have access to its base route after nesting to the app1 and also the url params", async () => {
+    const request = makeHttpRequest(BASE_URL + "/api/app3/a/b", {
+      method: "GET",
+    });
+    const response = await app1.handler()(request);
+    expect(response.status).toBe(200);
+    expect(request.params.foo).toBe("a");
+    expect(request.params.bar).toBe("b");
   });
 });

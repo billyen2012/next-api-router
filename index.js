@@ -430,6 +430,12 @@ const getRoutableNodeFromPathname = (
     break;
   }
 
+  // currentNode[ROUTER_ID_KEY] meaning it is at the root of a router level
+  if (typeof currentNode !== "undefined" && currentNode.routable) {
+    // then check should check the methods mapped in the base_route_key
+    currentNode = currentNode.routable[BASE_ROUTE_KEY];
+  }
+
   // no route found case
   if (
     typeof currentNode === "undefined" ||
