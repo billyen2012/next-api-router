@@ -559,6 +559,7 @@ const handleCb = async (
           break;
         case "object":
           response.json(returnedData);
+          break;
         default:
           next(
             new InvalidReturnDataTypeError(

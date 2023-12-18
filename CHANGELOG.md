@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.10.3
+
+### Patch Changes
+
+- fixed error message issue when object is returned for treatReturnAsResponse
+
 ## 1.10.2
 
 ### Patch Changes
