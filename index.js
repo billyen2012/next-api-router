@@ -43,7 +43,7 @@ import { makeTimeoutInstance } from "./src/util/makeTimeoutInstance";
  * @param {NextApiRouterResponse} response
  */
 
-export const compress = ({ size = 2000 } = {}) => {
+export const compress = ({ size = 2000, noCompression = false } = {}) => {
   if (typeof size !== "number") {
     throw new Error("compress option 'size' must be a number");
   }
@@ -53,8 +53,10 @@ export const compress = ({ size = 2000 } = {}) => {
    * @param {(err)=>{}} next
    */
   return async (req, res, next) => {
-    res._shouldCompress = true;
-    res._compressionOptions = { size };
+    res._shouldCompress = !noCompression;
+    if (res._shouldCompress == true) {
+      res._compressionOptions = { size };
+    }
     next();
   };
 };

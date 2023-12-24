@@ -37,6 +37,14 @@ app.get("/will-not-compress", async (req, res) => {
   res.send("123456789");
 });
 
+app.get(
+  "/no-compression-option",
+  compress({ noCompression: true }),
+  async (req, res) => {
+    res.send(answer);
+  }
+);
+
 const handler = app.handler();
 
 describe("compress middleware", () => {
@@ -147,5 +155,18 @@ describe("compress middleware", () => {
     const response = await handler(request);
     expect(response.headers.get("content-encoding")).toBe(null);
     expect(await response.text()).toBe("123456789");
+  });
+  test("noCompression will exclude route from compression", async () => {
+    const request = makeHttpRequest(
+      "http://localhost:3000/no-compression-option",
+      {
+        headers: {
+          "accept-encoding": "gzip, deflate, br",
+        },
+      }
+    );
+    const response = await handler(request);
+    expect(response.headers.get("content-encoding")).toBe(null);
+    expect(await response.text()).toBe(answer);
   });
 });

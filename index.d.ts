@@ -106,6 +106,11 @@ export type CompressionOptions = {
    * @default 2000
    **/
   size?: number;
+  /**
+   * will disabled compression
+   * @default false
+   **/
+  noCompression?: boolean;
 };
 
 export type UndiciRequestOptions = { dispatcher?: Dispatcher } & Omit<

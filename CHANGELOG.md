@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.11.1
+
+### Patch Changes
+
+- add `noCompression` option to `compress()` middleware
+
 ## 1.11.0
 
 ### Minor Changes
