@@ -227,17 +227,31 @@ describe("Basics of NextApiResponse class", () => {
     expect(response.headers.get("content-type")).toBe(null);
   });
 
-  test("send() will set Response object to _response", () => {
+  test("send() will set Response object to _responseMessageRaw and setoptions", async () => {
     const response = new NextApiRouterResponse();
     response.send("test");
     expect(response._sent).toBe(true);
+    expect(response._responseMessageRaw).toBe("test");
+    expect(response._responseOptions).not.toBeFalsy();
+    expect(response._response).toBe(null);
+  });
+
+  test("An actual response will make after calling res._Response()", async () => {
+    const response = new NextApiRouterResponse();
+    response.send("test");
+    expect(response._sent).toBe(true);
+    expect(response._response).toBe(null);
+    await response._Response();
     expect(response._response).toBeInstanceOf(Response);
+    expect(await response._response.text()).toBe("test");
   });
 
   describe("sendFile() should send a file to client with have following characteristics", () => {
     const response = new NextApiRouterResponse();
+    response._req = makeHttpRequest("http://localhost:3000/");
     beforeAll(async () => {
       await response.sendFile(process.cwd() + "/src/test-use/text.txt");
+      await response._Response();
     });
 
     test("sendFile() should send a file", async () => {
@@ -262,13 +276,17 @@ describe("Basics of NextApiResponse class", () => {
 
   test("pipe() can take Readable", async () => {
     const response = new NextApiRouterResponse();
+    response._req = makeHttpRequest("http://localhost:3000");
     await response.pipe(new Readable());
+    await response._Response();
     expect(response._response).toBeInstanceOf(Response);
   });
 
   test("pipe() can take a ReadableStream", async () => {
     const response = new NextApiRouterResponse();
+    response._req = makeHttpRequest("http://localhost:3000");
     await response.pipe(new ReadableStream());
+    await response._Response();
     expect(response._response).toBeInstanceOf(Response);
   });
 

@@ -6,6 +6,7 @@ import etag from "etag";
 import { fileMetaAsync } from "./util/fileMetaAsync";
 import { NotFoundError } from "./errors";
 import { request } from "undici";
+import { gzipAsync } from "./util/compressions";
 // only the common MIME TYPE
 const FILE_ENDING_TO_MIME_TYPE = {
   "7z": "application/x-7z-compressed",
@@ -95,33 +96,91 @@ const processPath = (path, fileName = "") => {
 };
 
 /**
+ * @param {any} message
+ * @param {import("../index").NextApiRouterRequest} req
+ * @param {NextApiRouterResponse} res
+ */
+const shouldCompress = (req, res, meetCompressSize = false) => {
+  if (!res._shouldCompress || !meetCompressSize) {
+    return false;
+  }
+
+  const acceptEncoding = req.headers.get("accept-encoding");
+
+  // may add other type of compression in the future
+  if (!String(acceptEncoding).includes("gzip")) {
+    return false;
+  }
+
+  res.setHeader("content-encoding", "gzip");
+
+  return true;
+};
+
+/**
  *
  * @param {any} message
- * @returns {{
+ * @param {NextApiRouterResponse} res
+ * @returns {Promise<{
  *  type:'string' | 'readable'
  *  message: string | Readable
- * }}
+ * }>}
  */
-const processResponseMessage = (message) => {
+const processResponseMessage = async (message, req, res) => {
   // null meaning no return body
   if (message == null) {
     return { type: "null", message };
   }
   /** buffer case */
   if (message instanceof Buffer) {
+    if (
+      shouldCompress(
+        req,
+        res,
+        typeof message[res._compressionOptions.size] !== "undefined"
+      )
+    ) {
+      message = await gzipAsync(message);
+    }
     return { type: "readable", message: new Readable.from(message) };
   }
   if (message instanceof ReadableStream) {
+    if (shouldCompress(req, res, true)) {
+      message = message.pipeThrough(new CompressionStream("gzip"));
+    }
+
     return { type: "readable", message };
   }
   /** any other case */
   if (typeof message === "object") {
     // convert object to string type
-    return { type: "string", message: JSON.stringify(message) };
+    message = JSON.stringify(message);
+    if (
+      shouldCompress(
+        req,
+        res,
+        typeof message[res._compressionOptions.size] !== "undefined"
+      )
+    ) {
+      message = await gzipAsync(message);
+    }
+    return { type: "string", message };
   }
 
-  return { type: "string", message: String(message) };
+  message = String(message);
+  if (
+    shouldCompress(
+      req,
+      res,
+      typeof message[res._compressionOptions.size] !== "undefined"
+    )
+  ) {
+    message = await gzipAsync(message);
+  }
+
+  return { type: "string", message };
 };
+
 export class NextApiRouterResponse extends Response {
   constructor({
     reqOrigin = null,
@@ -142,6 +201,8 @@ export class NextApiRouterResponse extends Response {
   _setContentType = null;
   _sent = null;
   _response = null;
+  _shouldCompress = false;
+  _compressionOptions = {};
   /**@type {URL} */
   _requestUrlObject = null;
   _statusText = null;
@@ -367,6 +428,15 @@ export class NextApiRouterResponse extends Response {
       this._nextPromiseResolver = null;
     }
   }
+  async _Response() {
+    const { message: processedMessage } = await processResponseMessage(
+      this._responseMessageRaw,
+      this._req,
+      this
+    );
+    this._response = new Response(processedMessage, this._responseOptions);
+    return this._response;
+  }
   send(message = null) {
     // _nextPromise will be bound from the handler()
     this.resolveNext();
@@ -400,9 +470,8 @@ export class NextApiRouterResponse extends Response {
     if (!this._sent) {
       this._startAt = process.hrtime();
       this._sent = true;
-
-      const { message: processedMessage } = processResponseMessage(message);
-      this._response = new Response(processedMessage, payloadOptions);
+      this._responseMessageRaw = message;
+      this._responseOptions = payloadOptions;
       return;
     }
   }

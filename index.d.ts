@@ -100,6 +100,14 @@ type HttpHeaders = [
   "x-xss-protection"
 ];
 
+export type CompressionOptions = {
+  /**
+   * minimum compression body size (2000 = 2kb)
+   * @default 2000
+   **/
+  size?: number;
+};
+
 export type UndiciRequestOptions = { dispatcher?: Dispatcher } & Omit<
   Dispatcher.RequestOptions,
   "origin" | "path" | "method"
@@ -252,6 +260,16 @@ export declare class MethodNotAllowedError extends NextApiRouteError {}
 export interface NextCallback {
   (error?: Error): void;
 }
+
+/**
+ * Will compress outgoing message with gzip.
+ *
+ * The incoming request's header for `accept-encoding` must include gzip
+ *
+ */
+export declare function compress(
+  options?: CompressionOptions
+): NextApiProcessCallback;
 
 export interface NextApiProcessCallback {
   (

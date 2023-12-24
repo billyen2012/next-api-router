@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.11.0
+
+### Minor Changes
+
+- add gzip compression feature
+
 ## 1.10.3
 
 ### Patch Changes

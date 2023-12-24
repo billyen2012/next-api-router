@@ -43,6 +43,22 @@ import { makeTimeoutInstance } from "./src/util/makeTimeoutInstance";
  * @param {NextApiRouterResponse} response
  */
 
+export const compress = ({ size = 2000 } = {}) => {
+  if (typeof size !== "number") {
+    throw new Error("compress option 'size' must be a number");
+  }
+  /**
+   * @param {import('.').NextApiRouterRequest} req
+   * @param {import("./src/response").NextApiRouterResponse} res
+   * @param {(err)=>{}} next
+   */
+  return async (req, res, next) => {
+    res._shouldCompress = true;
+    res._compressionOptions = { size };
+    next();
+  };
+};
+
 /**
  * @typedef {ReturnType<typeof NextApiRouter>} RouterInstance
  */
@@ -884,6 +900,7 @@ const NextApiRouter = (
 
         if (err instanceof Error) {
           await processRouterError(err, router, request, response);
+          await response._Response();
           return response._response;
         }
 
@@ -958,12 +975,14 @@ const NextApiRouter = (
                   request,
                   response
                 );
+                await response._Response();
                 return resolve(response._response);
               }
 
               if (response._sent) {
                 cleanUp();
                 // do not return, user might still call() next after response sent
+                await response._Response();
                 resolve(response._response);
                 isResolved = true;
               }
@@ -986,6 +1005,7 @@ const NextApiRouter = (
 
         if (result instanceof Error) {
           await processRouterError(result, router, request, response);
+          await response._Response();
           return response._response;
         }
 
@@ -1001,7 +1021,7 @@ const NextApiRouter = (
             request,
             response
           );
-
+          await response._Response();
           return response._response;
         }
 
@@ -1013,7 +1033,7 @@ const NextApiRouter = (
           response
         );
         // no response
-
+        await response._Response();
         return response._response;
       };
     },
