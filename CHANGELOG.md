@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.11.3
+
+### Patch Changes
+
+- `sendFile()` will bind to `req.signal` to detect client abort signal
+
 ## 1.11.2
 
 ### Patch Changes

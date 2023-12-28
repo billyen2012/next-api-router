@@ -320,7 +320,7 @@ export class NextApiRouterResponse extends Response {
     // map new etag
     eTagMap.set(_etag, true);
     // stream file to the client
-    const stream = fs.createReadStream(filePath);
+    const stream = fs.createReadStream(filePath, { signal: this._req.signal });
     await this.pipe(stream);
   }
   redirect(url) {
