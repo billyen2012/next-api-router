@@ -221,6 +221,7 @@ export declare class NextApiRouterResponse {
   statusMessage: string | undefined;
   statusCode: number | null;
   _startAt: [number, number];
+  isStreamEnded: null | boolean;
   setStatusMessage(message: string): this;
   setHeader(name: HttpHeaders[number], value: string): this;
   setHeaders(headers: HttpHeadersObject): this;

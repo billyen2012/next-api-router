@@ -1,5 +1,12 @@
 # @billyen2012/next-api-router
 
+## 1.11.2
+
+### Patch Changes
+
+- add `isStreamEnded` property to the response object
+- fix stream client abort issue
+
 ## 1.11.1
 
 ### Patch Changes

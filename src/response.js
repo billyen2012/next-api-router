@@ -206,6 +206,10 @@ export class NextApiRouterResponse extends Response {
   /**@type {URL} */
   _requestUrlObject = null;
   _statusText = null;
+  _isReadstreamEnded = null;
+  get isStreamEnded() {
+    return this._isReadstreamEnded;
+  }
   get statusMessage() {
     return this._statusText || undefined;
   }
@@ -362,17 +366,36 @@ export class NextApiRouterResponse extends Response {
     }
 
     if (stream instanceof Readable) {
-      const readableStream = new ReadableStream({
-        async pull(controller) {
-          for await (const chunk of stream) {
-            controller.enqueue(chunk);
-          }
-          controller.close();
-        },
-      });
+      return new Promise((resolve, reject) => {
+        const readableStream = new ReadableStream({
+          start: () => {
+            this._isReadstreamStarted = true;
+            stream.on("error", (err) => {
+              if (err.name === "AbortError") {
+                readableStream.cancel();
+              }
+            });
+          },
+          pull: async (controller) => {
+            for await (const chunk of stream) {
+              if (chunk) {
+                controller.enqueue(chunk);
+              }
+            }
 
-      this.send(readableStream);
-      return;
+            this._isReadstreamEnded = true;
+            controller.close();
+            resolve();
+          },
+          cancel: () => {
+            this._isReadstreamEnded = true;
+            resolve();
+          },
+        });
+
+        this.send(readableStream);
+        return;
+      });
     }
 
     throw new Error("pipe stream can only be a Readable or a ReadableStream");
@@ -477,10 +500,13 @@ export class NextApiRouterResponse extends Response {
   }
   _writeSetup() {
     if (!this._readstream) {
-      this._isEnded = false;
       this._readstream = new ReadableStream({
         start: async (controller) => {
+          this._isReadstreamStarted = true;
           this._readstreamController = controller;
+        },
+        cancel: () => {
+          this._isReadstreamEnded = true;
         },
       });
     }
@@ -490,6 +516,10 @@ export class NextApiRouterResponse extends Response {
     }
   }
   _processWriteMessage(message = "") {
+    if (this._isReadstreamEnded) {
+      return;
+    }
+
     this._readstreamController.enqueue(
       message instanceof Uint8Array
         ? message
@@ -522,10 +552,10 @@ export class NextApiRouterResponse extends Response {
     return this;
   }
   end(message = "") {
-    if (this._readstreamController && !this._isEnded) {
+    if (this._isReadstreamStarted && !this._isReadstreamEnded) {
       this._processWriteMessage(message);
       this._readstreamController.close();
-      this._isEnded = true;
+      this._isReadstreamEnded = true;
     }
   }
 }

@@ -277,9 +277,26 @@ describe("Basics of NextApiResponse class", () => {
   test("pipe() can take Readable", async () => {
     const response = new NextApiRouterResponse();
     response._req = makeHttpRequest("http://localhost:3000");
-    await response.pipe(new Readable());
+    const readable = new Readable();
+    // push a `null` to signal end of readable (see https://nodejs.org/api/stream.html#readablepushchunk-encoding for details)
+    readable.push(null);
+    await response.pipe(readable);
     await response._Response();
     expect(response._response).toBeInstanceOf(Response);
+    expect(response.isStreamEnded).toBeTruthy();
+  });
+
+  test("in pipe(), a Readable can be aborted with a AbortController signal", async () => {
+    const response = new NextApiRouterResponse();
+    response._req = makeHttpRequest("http://localhost:3000");
+    const abortController = new AbortController();
+    const readable = new Readable({
+      signal: abortController.signal,
+    });
+
+    abortController.abort();
+    await response.pipe(readable);
+    expect(response.isStreamEnded).toBeTruthy();
   });
 
   test("pipe() can take a ReadableStream", async () => {
