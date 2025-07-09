@@ -1,5 +1,11 @@
 # @billyen2012/next-api-router
 
+## 1.11.4
+
+### Patch Changes
+
+- upgrade all dependencies to the latest
+
 ## 1.11.3
 
 ### Patch Changes
