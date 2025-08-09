@@ -1,104 +1,103 @@
 import { type Data as EjsData, type Options as EjsOptions } from "ejs";
-import { type ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 import { type Readable } from "stream";
 import type fs from "fs";
 import type { Dispatcher } from "undici";
 
-type HttpHeaders = [
-  "accept",
-  "accept-charset",
-  "accept-datetime",
-  "accept-encoding",
-  "accept-language",
-  "accept-patch",
-  "accept-ranges",
-  "access-control-allow-credentials",
-  "access-control-allow-headers",
-  "access-control-allow-methods",
-  "access-control-allow-origin",
-  "access-control-expose-headers",
-  "access-control-max-age",
-  "access-control-request-headers",
-  "access-control-request-method",
-  "age",
-  "allow",
-  "alt-svc",
-  "authorization",
-  "cache-control",
-  "connection",
-  "content-disposition",
-  "content-encoding",
-  "content-language",
-  "content-length",
-  "content-location",
-  "content-range",
-  "content-type",
-  "cookie",
-  "date",
-  "delta-base",
-  "dnt",
-  "etag",
-  "expect",
-  "expires",
-  "forwarded",
-  "from",
-  "front-end-https",
-  "host",
-  "if-match",
-  "if-modified-since",
-  "if-none-match",
-  "if-range",
-  "if-unmodified-since",
-  "im",
-  "last-modified",
-  "link",
-  "location",
-  "max-forwards",
-  "origin",
-  "p3p",
-  "pragma",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "proxy-connection",
-  "public-key-pins",
-  "range",
-  "referer",
-  "refresh",
-  "retry-after",
-  "server",
-  "set-cookie",
-  "strict-transport-security",
-  "te",
-  "tk",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-  "user-agent",
-  "vary",
-  "via",
-  "warning",
-  "www-authenticate",
-  "x-att-deviceid",
-  "x-clacks-overhead",
-  "x-content-type-options",
-  "x-csrf-token",
-  "x-do-not-track",
-  "x-forwarded-for",
-  "x-forwarded-host",
-  "x-forwarded-proto",
-  "x-frame-options",
-  "x-http-method-override",
-  "x-permitted-cross-domain-policies",
-  "x-pingback",
-  "x-powered-by",
-  "x-request-id",
-  "x-requested-with",
-  "x-ua-compatible",
-  "x-uidh",
-  "x-wap-profile",
-  "x-webkit-csp",
-  "x-xss-protection"
-];
+type HttpHeaders =
+  | "accept"
+  | "accept-charset"
+  | "accept-datetime"
+  | "accept-encoding"
+  | "accept-language"
+  | "accept-patch"
+  | "accept-ranges"
+  | "access-control-allow-credentials"
+  | "access-control-allow-headers"
+  | "access-control-allow-methods"
+  | "access-control-allow-origin"
+  | "access-control-expose-headers"
+  | "access-control-max-age"
+  | "access-control-request-headers"
+  | "access-control-request-method"
+  | "age"
+  | "allow"
+  | "alt-svc"
+  | "authorization"
+  | "cache-control"
+  | "connection"
+  | "content-disposition"
+  | "content-encoding"
+  | "content-language"
+  | "content-length"
+  | "content-location"
+  | "content-range"
+  | "content-type"
+  | "cookie"
+  | "date"
+  | "delta-base"
+  | "dnt"
+  | "etag"
+  | "expect"
+  | "expires"
+  | "forwarded"
+  | "from"
+  | "front-end-https"
+  | "host"
+  | "if-match"
+  | "if-modified-since"
+  | "if-none-match"
+  | "if-range"
+  | "if-unmodified-since"
+  | "im"
+  | "last-modified"
+  | "link"
+  | "location"
+  | "max-forwards"
+  | "origin"
+  | "p3p"
+  | "pragma"
+  | "proxy-authenticate"
+  | "proxy-authorization"
+  | "proxy-connection"
+  | "public-key-pins"
+  | "range"
+  | "referer"
+  | "refresh"
+  | "retry-after"
+  | "server"
+  | "set-cookie"
+  | "strict-transport-security"
+  | "te"
+  | "tk"
+  | "trailer"
+  | "transfer-encoding"
+  | "upgrade"
+  | "user-agent"
+  | "vary"
+  | "via"
+  | "warning"
+  | "www-authenticate"
+  | "x-att-deviceid"
+  | "x-clacks-overhead"
+  | "x-content-type-options"
+  | "x-csrf-token"
+  | "x-do-not-track"
+  | "x-forwarded-for"
+  | "x-forwarded-host"
+  | "x-forwarded-proto"
+  | "x-frame-options"
+  | "x-http-method-override"
+  | "x-permitted-cross-domain-policies"
+  | "x-pingback"
+  | "x-powered-by"
+  | "x-request-id"
+  | "x-requested-with"
+  | "x-ua-compatible"
+  | "x-uidh"
+  | "x-wap-profile"
+  | "x-webkit-csp"
+  | "x-xss-protection"
+  | (string & {});
 
 export type CompressionOptions = {
   /**
@@ -213,17 +212,17 @@ export type HttpHeadersObject = {
   "x-wap-profile"?: string;
   "x-webkit-csp"?: string;
   "x-xss-protection"?: string;
+  [key: string]: string | undefined;
 };
 
 export declare class NextApiRouterResponse {
   headers: Headers;
-  cookies: ReadonlyRequestCookies;
   statusMessage: string | undefined;
   statusCode: number | null;
   _startAt: [number, number];
   isStreamEnded: null | boolean;
   setStatusMessage(message: string): this;
-  setHeader(name: HttpHeaders[number], value: string): this;
+  setHeader(name: HttpHeaders, value: string): this;
   setHeaders(headers: HttpHeadersObject): this;
   status(code: number): this;
   /**
@@ -248,10 +247,10 @@ export declare class NextApiRouterResponse {
   writeHead(statusCode: number, headers?: HttpHeadersObject): this;
   writeLine(message?: number | string | Uint8Array): this;
   end(message?: number | string | Uint8Array): void;
-  getHeader(name: HttpHeaders[number]): string;
+  getHeader(name: HttpHeader): string;
   getHeaders: typeof GetHeaders;
   removeHeader(name: string): this;
-  rewrite(url: string | url, options?: UndiciRequestOptions): Promise<void>;
+  rewrite(url: string | URL, options?: UndiciRequestOptions): Promise<void>;
 }
 export declare class NextApiRouteError extends Error {
   constructor(message: string);
@@ -296,12 +295,11 @@ export interface NextApiErrorHandlerCallback {
 
 export type NextApiRouterRequest = Request & {
   session?: any;
-  cookies: ReadonlyRequestCookies;
   query: Record<string | number, any>;
   params: Record<string | number, any>;
   data?: any;
   ip?: string;
-  getHeader(name: HttpHeaders[number]): string;
+  getHeader(name: HttpHeaders): string;
   getHeaders: typeof GetHeaders;
   _startAt: [number, number];
   // allowing add any prop
@@ -309,7 +307,7 @@ export type NextApiRouterRequest = Request & {
 };
 
 declare function GetHeaders<T extends string>(
-  name?: HttpHeaders[number][] | T[] | string[]
+  name?: HttpHeaders[] | T[] | string[]
 ): Partial<Record<T, string>>;
 
 export type BodyParserOptions = {

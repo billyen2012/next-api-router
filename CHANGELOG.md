@@ -1,5 +1,13 @@
 # @billyen2012/next-api-router
 
+## 1.11.5
+
+### Patch Changes
+
+- fix types (remove cookies from both request and )
+- fix url request type
+- fix header type
+
 ## 1.11.4
 
 ### Patch Changes
