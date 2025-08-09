@@ -247,7 +247,7 @@ export declare class NextApiRouterResponse {
   writeHead(statusCode: number, headers?: HttpHeadersObject): this;
   writeLine(message?: number | string | Uint8Array): this;
   end(message?: number | string | Uint8Array): void;
-  getHeader(name: HttpHeader): string;
+  getHeader(name: HttpHeaders): string;
   getHeaders: typeof GetHeaders;
   removeHeader(name: string): this;
   rewrite(url: string | URL, options?: UndiciRequestOptions): Promise<void>;

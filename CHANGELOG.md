@@ -1,6 +1,6 @@
 # @billyen2012/next-api-router
 
-## 1.11.5
+## 1.11.6
 
 ### Patch Changes
 
