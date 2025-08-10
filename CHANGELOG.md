@@ -4,7 +4,7 @@
 
 ### Patch Changes
 
-- fix types (remove cookies from both request and )
+- fix types (remove cookies from both request and response)
 - fix url request type
 - fix header type
 
